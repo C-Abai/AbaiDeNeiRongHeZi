@@ -34,7 +34,7 @@ body.has-wallpaper .app { background: transparent; }
 body.has-wallpaper .main { background: transparent; }
 body.has-wallpaper .header { background: rgba(255,255,255,.55); backdrop-filter: saturate(180%) blur(10px); }
 body.has-wallpaper .overlay { background: rgba(255,255,255,.92); }
-body.wallpaper-full .header { background: transparent; border-bottom: none; backdrop-filter: none; }
+body.wallpaper-full .header { background: rgba(16,18,24,.42); border-bottom: none; backdrop-filter: saturate(160%) blur(12px); -webkit-backdrop-filter: saturate(160%) blur(12px); }
 body.wallpaper-full .brand { color: #fff; text-shadow: 0 1px 4px rgba(0,0,0,.55); }
 body.wallpaper-full .brand-sub { color: rgba(255,255,255,.85); text-shadow: 0 1px 4px rgba(0,0,0,.55); }
 body.wallpaper-full .brand .dot { box-shadow: 0 1px 4px rgba(0,0,0,.5); }
@@ -58,11 +58,25 @@ button { font-family: inherit; cursor: pointer; }
   backdrop-filter: saturate(180%) blur(8px);
   border-bottom: 1rpx solid var(--line);
 }
+/* 顶部玻璃蒙版：内容向上滑入时在此处被柔化遮挡，避免与导航文字硬重叠（红框需求） */
+.header::after {
+  content: '';
+  position: absolute;
+  left: 0; right: 0; bottom: -22px; height: 22px;
+  pointer-events: none;
+  background: linear-gradient(to bottom, rgba(245,246,248,.95), rgba(245,246,248,0));
+  backdrop-filter: blur(6px) saturate(160%);
+  -webkit-backdrop-filter: blur(6px) saturate(160%);
+}
+body.dim .header::after,
+body.wallpaper-full .header::after {
+  background: linear-gradient(to bottom, rgba(16,18,24,.72), rgba(16,18,24,0));
+}
 .header-inner {
   max-width: var(--maxw);
   margin: 0 auto;
   /* 顶部安全区：装成 App/全屏时自动避开刘海与前置摄像头；浏览器里 env() 为 0 不受影响 */
-  padding: calc(env(safe-area-inset-top, 0px) + 14px) 16px 10px;
+  padding: calc(env(safe-area-inset-top, 0px) + 6px) 16px 8px;
 }
 .brand {
   font-size: 22px;
@@ -102,7 +116,7 @@ button { font-family: inherit; cursor: pointer; }
 /* 区块标题：加深加大 + 绿色竖条点缀，壁纸上也醒目 */
 .section-title {
   font-size: 16px; font-weight: 700; color: var(--text);
-  margin: 12px 4px 12px; letter-spacing: .5px;
+  margin: 6px 4px 10px; letter-spacing: .5px;
   display: flex; align-items: center; gap: 8px;
   text-shadow: 0 1px 3px rgba(255,255,255,.4);
 }
@@ -111,15 +125,55 @@ button { font-family: inherit; cursor: pointer; }
   background: var(--green); flex: none;
 }
 
+/* 文章/黑科技列表顶部搜索栏（按标题/摘要/正文/标签/分类实时过滤） */
+.post-search { padding: 4px 0 8px; }
+.post-search-input {
+  width: 100%; box-sizing: border-box; padding: 9px 14px;
+  border-radius: 999px; border: 1px solid var(--line);
+  background: var(--card-bg, var(--card)); color: var(--text);
+  font-size: 14px; outline: none;
+}
+.post-search-input::placeholder { color: var(--muted); }
+body.has-wallpaper .post-search-input {
+  backdrop-filter: saturate(150%) blur(8px); -webkit-backdrop-filter: saturate(150%) blur(8px);
+}
+body.dim .post-search-input {
+  background: rgba(255,255,255,.08); border-color: rgba(255,255,255,.12); color: #f4f6f9;
+}
+body.dim .post-search-input::placeholder { color: rgba(255,255,255,.45); }
+
+/* 置顶折叠卡片：所有置顶内容收进一处，默认展开、可点标题折叠（黄框需求） */
+.pinned-card {
+  border-radius: 12px; margin: 0 0 9px; overflow: hidden;
+  background: var(--card-bg, var(--card));
+  border: 1px solid rgba(7,193,96,.3);
+  box-shadow: 0 2px 8px rgba(0,0,0,.04);
+}
+.pinned-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 9px 12px; font-size: 13px; font-weight: 700; color: var(--green);
+  cursor: pointer; user-select: none;
+}
+.pinned-head .pinned-toggle { font-size: 12px; color: var(--muted); font-weight: 600; }
+.pinned-body .card {
+  margin-bottom: 0; border-radius: 0; box-shadow: none;
+  border-bottom: 1px solid var(--line); background: transparent; padding: 11px;
+}
+.pinned-body .card:last-child { border-bottom: none; }
+.pinned-card:not(.open) .pinned-body { display: none; }
+body.dim .pinned-card { border-color: rgba(7,193,96,.4); }
+body.dim .pinned-head { color: #2fd07a; }
+body.dim .pinned-body .card { border-bottom-color: rgba(255,255,255,.08); }
+
 .card {
   /* 内容气泡透明度由后台「内容气泡透明度」滑块控制（--card-bg 为带 alpha 的颜色） */
   background: var(--card-bg, var(--card));
-  border-radius: 14px;
-  padding: 16px;
-  margin-bottom: 12px;
-  box-shadow: 0 2px 10px rgba(0,0,0,.04);
+  border-radius: 12px;
+  padding: 11px;
+  margin-bottom: 9px;
+  box-shadow: 0 2px 8px rgba(0,0,0,.04);
   display: flex;
-  gap: 14px;
+  gap: 11px;
   align-items: center;
 }
 /* 浅色模式下（有壁纸时）：内容气泡做成半透明白玻璃，能透出背景壁纸，有通透玻璃质感 */
@@ -136,7 +190,7 @@ body.has-wallpaper .link-group-head {
 }
 .card.hero, .card.land { flex-direction: column; align-items: stretch; }
 .card-cover {
-  width: 84px; height: 84px; border-radius: 12px; object-fit: cover; flex: none;
+  width: 60px; height: 60px; border-radius: 10px; object-fit: cover; flex: none;
   background: #eee;
 }
 /* 横屏宽幅封面：顶部通栏大图 + 红色边框突出 */
@@ -145,9 +199,9 @@ body.has-wallpaper .link-group-head {
   object-fit: cover; border: 2px solid rgba(229,57,53,.55); box-sizing: border-box;
 }
 .card-body { flex: 1; min-width: 0; }
-.card-title { font-size: 16px; font-weight: 600; margin: 0 0 4px; }
+.card-title { font-size: 15px; font-weight: 600; margin: 0 0 3px; }
 .card-desc {
-  color: var(--muted); font-size: 13px; margin: 0;
+  color: var(--muted); font-size: 12.5px; margin: 0;
   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
 }
 .tag {

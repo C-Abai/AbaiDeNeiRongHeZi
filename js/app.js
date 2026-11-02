@@ -266,12 +266,18 @@
     else renderAbout(main);
   }
 
-  function renderList(main, category, title) {
-    let list = CBStore.publicPosts(content, category).concat(localPostsAll());
-    let html = '<div class="section-title">' + title + '</div>';
-    if (!list.length) html += '<div class="empty">还没有内容，去后台添加吧</div>';
-    list.forEach(function (p, i) {
-      const hero = (i === 0 && category === 'article' && p.pinned) ? ' hero' : '';
+  // === 列表搜索 / 置顶折叠：状态与辅助 ===
+  const searchState = {};   // 各分类的搜索关键词
+  let pinnedOpen = true;    // 置顶卡片是否展开
+
+  // 按关键词匹配：主题(分类)/标题/摘要/正文/标签
+  function matchPost(p, kw) {
+    const hay = [p.title, p.summary, p.content, p.category, (p.tags || []).join(' ')].join(' ').toLowerCase();
+    return hay.indexOf(kw) !== -1;
+  }
+  // 生成一组帖子卡片（压缩尺寸由 CSS 控制）
+  function cardsHtml(list, category) {
+    return list.map(function (p) {
       const land = p.coverShape === 'landscape' ? ' land' : '';
       const badge = p.__local ? '<span class="link-local-badge">本地</span>' : '';
       const del = p.__local ? '<button class="link-del" data-pdel="' + esc(p.id) + '">删除</button>' : '';
@@ -279,16 +285,58 @@
       const cover = p.cover
         ? '<img class="card-cover' + land + '" src="' + esc(p.cover) + '" alt=""/>'
         : '<div class="card-cover' + land + '"></div>';
-      html += '<div class="card' + hero + land + '" data-id="' + p.id + '">' + cover
+      return '<div class="card' + land + '" data-id="' + p.id + '">' + cover
         + '<div class="card-body"><div class="card-title">' + esc(p.title) + badge + del + newFlag
         + (p.pinned ? '<span class="pin-flag">置顶</span>' : '') + '</div>'
         + '<p class="card-desc">' + esc(p.summary || '') + '</p></div></div>';
-    });
-    // 文章界面底部：隐蔽的「本地新建内容」入口（低调小字，默认折叠）
-    if (category === 'article') {
-      html += localPostComposerHtml();
+    }).join('');
+  }
+  // 列表主体（不含搜索栏与本地发帖入口）：有搜索词则过滤，否则分置顶折叠卡 + 普通列表
+  function listInnerHtml(category, all, title) {
+    const kw = (searchState[category] || '').trim().toLowerCase();
+    let html = '<div class="section-title">' + title + '</div>';
+    if (kw) {
+      const matched = all.filter(function (p) { return matchPost(p, kw); });
+      html += matched.length ? cardsHtml(matched, category) : '<div class="empty">没有匹配的内容</div>';
+      return html;
     }
-    main.innerHTML = html;
+    const pinned = all.filter(function (p) { return p.pinned; });
+    const others = all.filter(function (p) { return !p.pinned; });
+    if (pinned.length) {
+      html += '<div class="pinned-card' + (pinnedOpen ? ' open' : '') + '">'
+        + '<div class="pinned-head" id="pinnedHead">📌 置顶内容 <span class="pinned-toggle">' + (pinnedOpen ? '▾' : '▸') + '</span></div>'
+        + '<div class="pinned-body" id="pinnedBody">' + cardsHtml(pinned, category) + '</div>'
+        + '</div>';
+    }
+    html += others.length ? cardsHtml(others, category) : '<div class="empty">还没有内容，去后台添加吧</div>';
+    return html;
+  }
+  function refreshListBody(main, category) {
+    const wrap = main.querySelector('#postListWrap');
+    if (!wrap) return;
+    const all = CBStore.publicPosts(content, category).concat(localPostsAll());
+    const title = category === 'article' ? '最新文章' : '黑科技 · 文章';
+    wrap.innerHTML = listInnerHtml(category, all, title);
+    bindCards(main);
+    bindPinnedToggle(main, category);
+  }
+  function bindSearch(main, category) {
+    const input = main.querySelector('#postSearch');
+    if (!input) return;
+    input.addEventListener('input', function () {
+      searchState[category] = input.value;
+      refreshListBody(main, category);
+    });
+  }
+  function bindPinnedToggle(main, category) {
+    const head = main.querySelector('#pinnedHead');
+    if (!head) return;
+    head.addEventListener('click', function () {
+      pinnedOpen = !pinnedOpen;
+      refreshListBody(main, category);
+    });
+  }
+  function bindCards(main) {
     main.querySelectorAll('.card[data-id]').forEach(function (c) {
       c.addEventListener('click', function () { openDetail(c.dataset.id); });
     });
@@ -300,7 +348,20 @@
         render();
       });
     });
-    bindLocalPostComposer();
+  }
+
+  function renderList(main, category, title, extraHtml) {
+    const all = CBStore.publicPosts(content, category).concat(localPostsAll());
+    const kw = (searchState[category] || '').trim().toLowerCase();
+    let html = '<div class="post-search"><input id="postSearch" class="post-search-input" type="search" enterkeyhint="search" placeholder="搜索主题、标题或内容…" value="' + esc(searchState[category] || '') + '"/></div>'
+      + '<div id="postListWrap">' + listInnerHtml(category, all, title) + '</div>';
+    // 非文章分类（黑科技）在无搜索词时追加工具/链接区；有搜索词则只显示匹配文章
+    if (extraHtml && !kw) html += extraHtml;
+    if (category === 'article') html += localPostComposerHtml();
+    main.innerHTML = html;
+    bindSearch(main, category);
+    bindCards(main);
+    bindPinnedToggle(main, category);
   }
 
   // 隐蔽的本地发帖表单（与后台发帖字段一致：标题/分类/摘要/正文/封面/置顶）
@@ -402,20 +463,10 @@
   function setLocalPosts(a) { try { localStorage.setItem(LP_KEY, JSON.stringify(a)); } catch (e) {} }
   function dropLocalPost(id) { setLocalPosts(localPosts().filter(function (x) { return x.id !== id; })); }
 
-  function renderTech(main) {
-    let html = '<div class="section-title">黑科技 · 文章</div>';
-    const list = CBStore.publicPosts(content, 'tech').concat(localPostsAll());
-    if (list.length) {
-      list.forEach(function (p) {
-        // 紧凑气泡：标签并入标题行，摘要只留一行，减少占屏
-        const tNew = isPostNew(p) ? '<span class="post-new-flag tiny">新</span>' : '';
-        html += '<div class="card slim" data-id="' + p.id + '"><div class="card-body">'
-          + '<div class="card-title"><span class="tag tech">黑科技</span>' + esc(p.title) + tNew + '</div>'
-          + '<p class="card-desc">' + esc(p.summary || '') + '</p></div></div>';
-      });
-    } else {
-      html += '<div class="empty">暂无黑科技文章</div>';
-    }
+  let techToolsCfg = [];   // 供 bindTechExtra 的磁贴点击查找工具配置
+
+  // 黑科技栏的「工具集合 / 链接分组 / 小工具 / 本地快捷方式」区（不含文章列表），供搜索栏接入
+  function techExtraHtml() {
     const showTools = (content.config && content.config.showTools !== false);
     let toolsCfg = (content.config && content.config.tools);
     if (!Array.isArray(toolsCfg) || !toolsCfg.length) {
@@ -424,6 +475,7 @@
         return { id: 't_' + e.id, name: e.name, engine: e.id, enabled: true, order: i + 1 };
       });
     }
+    techToolsCfg = toolsCfg;
     // 公开配置里的链接 + 本机自己添加的链接，合并后一起展示
     const cfgLinks = (content.config && content.config.links) || [];
     const cfgGroups = (content.config && content.config.linkGroups) || [];
@@ -431,42 +483,43 @@
     const myLinks = localLinks().map(function (l) { const o = Object.assign({}, l); o.__local = true; return o; });
     const links = cfgLinks.concat(myLinks);
     const groups = cfgGroups.concat(myGroups);
+    let html = '';
+    function linkCard(lk) {
+      const safeUrl = /^https?:\/\//i.test(lk.url || '') ? lk.url : '#';
+      const ic = lk.icon ? '<img class="link-ic" src="' + esc(lk.icon) + '" alt=""/>' : '';
+      const badge = lk.__local ? '<span class="link-local-badge">本地</span>' : '';
+      const del = lk.__local ? '<button class="link-del" data-lid="' + esc(lk.id) + '">删除</button>' : '';
+      // 影视类分组（影视/视频/TV 等）：走应用内观看页，支持横屏全屏，避免跳外部后无法控制全屏方向
+      const inWatch = (function () {
+        const g = groups.find(function (x) { return x.id === lk.groupId; });
+        return !!g && /影视|视频|tv|电影|追剧|影视合集|影音/i.test(g.name || '');
+      })();
+      const href = inWatch ? ('watch.html?url=' + encodeURIComponent(safeUrl) + '&name=' + encodeURIComponent(lk.title || '影视')) : safeUrl;
+      const linkAttr = inWatch ? '' : ' target="_blank" rel="noopener noreferrer"';
+      return '<a class="card link-item" href="' + esc(href) + '"' + linkAttr + '>'
+        + (ic ? '<div class="link-ic-wrap">' + ic + '</div>' : '')
+        + '<div class="card-body">'
+        + '<div class="card-title">' + esc(lk.title) + badge + '</div>'
+        + (lk.description ? '<p class="card-desc">' + esc(lk.description) + '</p>' : '')
+        + '<p class="card-desc">' + esc(lk.url) + '</p></div>'
+        + '<div class="row" style="flex:none;align-items:center;gap:8px">' + del
+        + '<span class="pin-flag">打开 ↗</span></div></a>';
+    }
+    // 合集折叠块：默认展开；点击标题头展开/收拢，状态存 localStorage 记忆
+    function groupBlock(gid, gname, items) {
+      let collapsed = false;
+      try { collapsed = localStorage.getItem('cb_grp_' + gid) === '1'; } catch (e) {}
+      return '<div class="link-group" data-gid="' + esc(gid) + '">'
+        + '<div class="link-group-head' + (collapsed ? ' closed' : '') + '">'
+        + '<span class="link-group-title">' + esc(gname) + '</span>'
+        + '<span class="link-group-count">' + items.length + '</span>'
+        + '<span class="link-group-arrow">▼</span></div>'
+        + '<div class="link-group-body"' + (collapsed ? ' style="display:none"' : '') + '>'
+        + items.map(function (l) { return linkCard(l); }).join('')
+        + '</div></div>';
+    }
     if (links.length) {
       html += '<div class="section-title">🔥 热门工具集合</div>';
-      function linkCard(lk) {
-        const safeUrl = /^https?:\/\//i.test(lk.url || '') ? lk.url : '#';
-        const ic = lk.icon ? '<img class="link-ic" src="' + esc(lk.icon) + '" alt=""/>' : '';
-        const badge = lk.__local ? '<span class="link-local-badge">本地</span>' : '';
-        const del = lk.__local ? '<button class="link-del" data-lid="' + esc(lk.id) + '">删除</button>' : '';
-        // 影视类分组（影视/视频/TV 等）：走应用内观看页，支持横屏全屏，避免跳外部后无法控制全屏方向
-        const inWatch = (function () {
-          const g = groups.find(function (x) { return x.id === lk.groupId; });
-          return !!g && /影视|视频|tv|电影|追剧|影视合集|影音/i.test(g.name || '');
-        })();
-        const href = inWatch ? ('watch.html?url=' + encodeURIComponent(safeUrl) + '&name=' + encodeURIComponent(lk.title || '影视')) : safeUrl;
-        const linkAttr = inWatch ? '' : ' target="_blank" rel="noopener noreferrer"';
-        return '<a class="card link-item" href="' + esc(href) + '"' + linkAttr + '>'
-          + (ic ? '<div class="link-ic-wrap">' + ic + '</div>' : '')
-          + '<div class="card-body">'
-          + '<div class="card-title">' + esc(lk.title) + badge + '</div>'
-          + (lk.description ? '<p class="card-desc">' + esc(lk.description) + '</p>' : '')
-          + '<p class="card-desc">' + esc(lk.url) + '</p></div>'
-          + '<div class="row" style="flex:none;align-items:center;gap:8px">' + del
-          + '<span class="pin-flag">打开 ↗</span></div></a>';
-      }
-      // 合集折叠块：默认展开；点击标题头展开/收拢，状态存 localStorage 记忆
-      function groupBlock(gid, gname, items) {
-        let collapsed = false;
-        try { collapsed = localStorage.getItem('cb_grp_' + gid) === '1'; } catch (e) {}
-        return '<div class="link-group" data-gid="' + esc(gid) + '">'
-          + '<div class="link-group-head' + (collapsed ? ' closed' : '') + '">'
-          + '<span class="link-group-title">' + esc(gname) + '</span>'
-          + '<span class="link-group-count">' + items.length + '</span>'
-          + '<span class="link-group-arrow">▼</span></div>'
-          + '<div class="link-group-body"' + (collapsed ? ' style="display:none"' : '') + '>'
-          + items.map(function (l) { return linkCard(l); }).join('')
-          + '</div></div>';
-      }
       if (groups.length) {
         const sorted = groups.slice().sort(function (a, b) { return (a.order || 0) - (b.order || 0); });
         sorted.forEach(function (g) {
@@ -502,7 +555,10 @@
     }
     // 黑科技栏最底部：本地快捷方式入口（默认折叠，点标题展开）
     html += localEntryHtml(groups);
-    main.innerHTML = html;
+    return html;
+  }
+
+  function bindTechExtra(main) {
     bindLocalBox();
     // 合集折叠交互
     main.querySelectorAll('.link-group-head').forEach(function (h) {
@@ -518,19 +574,8 @@
     // 小工具磁贴：点击在弹窗里打开该工具（保持黑科技栏整洁，避免长列表扎堆）
     main.querySelectorAll('.tool-tile').forEach(function (tile) {
       tile.addEventListener('click', function () {
-        const cfg = toolsCfg.find(function (t) { return t.id === tile.dataset.tool; });
+        const cfg = techToolsCfg.find(function (t) { return t.id === tile.dataset.tool; });
         if (cfg) openTool(cfg);
-      });
-    });
-    main.querySelectorAll('.card[data-id]').forEach(function (c) {
-      c.addEventListener('click', function () { openDetail(c.dataset.id); });
-    });
-    main.querySelectorAll('[data-pdel]').forEach(function (b) {
-      b.addEventListener('click', function (e) {
-        e.stopPropagation();
-        dropLocalPost(b.dataset.pdel);
-        toast('已删除本机内容');
-        render();
       });
     });
     // 本地链接卡片上的「删除」按钮（阻止默认导航与冒泡，避免同时打开网址）
@@ -542,6 +587,12 @@
         render();
       });
     });
+  }
+
+  function renderTech(main) {
+    const extra = techExtraHtml();
+    renderList(main, 'tech', '黑科技 · 文章', extra);
+    bindTechExtra(main);
   }
 
   // 本地快捷方式入口块：低调的小字入口 + 折叠面板（后台「网址快捷方式」同款字段：名称/网址/介绍/图标/合集）
