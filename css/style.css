@@ -1,0 +1,906 @@
+:root {
+  --green: #07c160;
+  --green-d: #07a84e;
+  --bg: #f5f6f8;
+  --card: #ffffff;
+  --text: #1f2329;
+  --muted: #8a8f99;
+  --line: #ebedf0;
+  --danger: #fa5151;
+  --dim-scrim: .72;
+  --radius: 16rpx;
+  --maxw: 720px;
+}
+
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, "PingFang SC", "Helvetica Neue", Helvetica, sans-serif;
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+/* ---------- 壁纸层 ---------- */
+.wallpaper {
+  position: fixed; inset: 0; z-index: -1; display: none;
+  background-size: cover; background-position: center; background-repeat: no-repeat;
+  pointer-events: none;
+}
+body.has-wallpaper .app { background: transparent; }
+body.has-wallpaper .main { background: transparent; }
+body.has-wallpaper .header { background: rgba(255,255,255,.55); backdrop-filter: saturate(180%) blur(10px); }
+body.has-wallpaper .overlay { background: rgba(255,255,255,.92); }
+body.wallpaper-full .header { background: transparent; border-bottom: none; backdrop-filter: none; }
+body.wallpaper-full .brand { color: #fff; text-shadow: 0 1px 4px rgba(0,0,0,.55); }
+body.wallpaper-full .brand-sub { color: rgba(255,255,255,.85); text-shadow: 0 1px 4px rgba(0,0,0,.55); }
+body.wallpaper-full .brand .dot { box-shadow: 0 1px 4px rgba(0,0,0,.5); }
+
+button { font-family: inherit; cursor: pointer; }
+
+.app {
+  max-width: var(--maxw);
+  margin: 0 auto;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ---------- Header ---------- */
+.header {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  background: rgba(245, 246, 248, 0.92);
+  backdrop-filter: saturate(180%) blur(8px);
+  border-bottom: 1rpx solid var(--line);
+}
+.header-inner {
+  max-width: var(--maxw);
+  margin: 0 auto;
+  /* 顶部安全区：装成 App/全屏时自动避开刘海与前置摄像头；浏览器里 env() 为 0 不受影响 */
+  padding: calc(env(safe-area-inset-top, 0px) + 14px) 16px 10px;
+}
+.brand {
+  font-size: 22px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 8px;
+}
+.brand .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--green); }
+.brand-sub {
+  color: var(--muted); font-size: 12px; font-weight: 400;
+  width: 100%; margin-left: 16px; margin-top: -2px; line-height: 1.5;
+}
+
+.tabs {
+  display: flex;
+  gap: 6px;
+  margin-top: 12px;
+}
+.tab {
+  flex: 1;
+  text-align: center;
+  padding: 9px 0;
+  border-radius: 999px;
+  /* 导航按钮透明度由后台「导航按钮透明度」滑块控制（--bar-alpha 0~1） */
+  background: rgba(255, 255, 255, var(--bar-alpha, .92));
+  border: 1rpx solid var(--line);
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 600;
+}
+.tab.active { background: rgba(var(--green-rgb, 7, 193, 96), var(--bar-alpha, .92)); color: #fff; border-color: var(--green); }
+
+/* ---------- Content ---------- */
+.main { flex: 1; padding: 16px; }
+/* 区块标题：加深加大 + 绿色竖条点缀，壁纸上也醒目 */
+.section-title {
+  font-size: 16px; font-weight: 700; color: var(--text);
+  margin: 12px 4px 12px; letter-spacing: .5px;
+  display: flex; align-items: center; gap: 8px;
+  text-shadow: 0 1px 3px rgba(255,255,255,.4);
+}
+.section-title::before {
+  content: ''; width: 4px; height: 16px; border-radius: 2px;
+  background: var(--green); flex: none;
+}
+
+.card {
+  /* 内容气泡透明度由后台「内容气泡透明度」滑块控制（--card-bg 为带 alpha 的颜色） */
+  background: var(--card-bg, var(--card));
+  border-radius: 14px;
+  padding: 16px;
+  margin-bottom: 12px;
+  box-shadow: 0 2px 10px rgba(0,0,0,.04);
+  display: flex;
+  gap: 14px;
+  align-items: center;
+}
+/* 浅色模式下（有壁纸时）：内容气泡做成半透明白玻璃，能透出背景壁纸，有通透玻璃质感 */
+body.has-wallpaper .card,
+body.has-wallpaper .tool,
+body.has-wallpaper .install-mini,
+body.has-wallpaper .install-card,
+body.has-wallpaper .author-card,
+body.has-wallpaper .link-group-head {
+  backdrop-filter: saturate(150%) blur(var(--card-blur, 0px));
+  -webkit-backdrop-filter: saturate(150%) blur(var(--card-blur, 0px));
+  border: 1px solid rgba(255, 255, 255, .55);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, .10);
+}
+.card.hero, .card.land { flex-direction: column; align-items: stretch; }
+.card-cover {
+  width: 84px; height: 84px; border-radius: 12px; object-fit: cover; flex: none;
+  background: #eee;
+}
+/* 横屏宽幅封面：顶部通栏大图 + 红色边框突出 */
+.card-cover.land {
+  width: 100%; height: auto; aspect-ratio: 16 / 9; border-radius: 12px;
+  object-fit: cover; border: 2px solid rgba(229,57,53,.55); box-sizing: border-box;
+}
+.card-body { flex: 1; min-width: 0; }
+.card-title { font-size: 16px; font-weight: 600; margin: 0 0 4px; }
+.card-desc {
+  color: var(--muted); font-size: 13px; margin: 0;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.tag {
+  display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 999px;
+  background: rgba(7,193,96,.12); color: var(--green); margin-right: 6px; font-weight: 600;
+}
+.tag.tech { background: rgba(64,120,242,.12); color: #4078f2; }
+.pin-flag { color: var(--green); font-size: 11px; margin-left: 6px; }
+
+/* 后台卡片（小工具 / 热门工具）：纵向堆叠，标题整行显示，操作按钮换行在下方，
+   避免窄屏下「标题被按钮行挤压成竖排」 */
+.adm-card { display: flex; flex-direction: column; align-items: stretch; gap: 10px; }
+.adm-card .card-body { flex: none; min-width: 0; }
+.adm-link-head { display: flex; align-items: center; gap: 10px; }
+.adm-link-head .card-title { margin: 0; }
+.adm-link-head .link-ic-mini { margin-bottom: 0; }
+.adm-link-head .link-ic { width: 32px; height: 32px; border-radius: 8px; }
+.adm-actions { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.adm-actions .tool-toggle { display: inline-flex; align-items: center; gap: 4px; }
+/* 后台分组标题（合集）更紧凑、与卡片有间隔 */
+.adm-group-title { font-size: 14px; font-weight: 700; margin: 14px 0 6px; color: var(--text); }
+/* 内容「新 / 更新」红点提醒：小红标，挂在标题后 */
+.post-new-flag {
+  display: inline-block; margin-left: 7px; padding: 1px 7px; border-radius: 999px;
+  background: #ff3b30; color: #fff; font-size: 11px; font-weight: 700; line-height: 16px;
+  vertical-align: 1px; box-shadow: 0 0 0 2px rgba(255,59,48,.16); animation: pnf-pop .25s ease;
+}
+.post-new-flag.tiny { font-size: 10px; padding: 0 6px; line-height: 15px; margin-left: 5px; vertical-align: 1px; }
+@keyframes pnf-pop { from { transform: scale(.6); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+body.dim .post-new-flag { background: #ff453a; box-shadow: 0 0 0 2px rgba(255,69,58,.22); }
+
+/* 关于本应用：说明全文展示，保留换行，不被两行截断 */
+.about-text {
+  white-space: pre-wrap; word-break: break-word; font-size: 14px; line-height: 1.85;
+  color: var(--text); margin: 0;
+}
+
+/* 公开端「本地快捷方式」：极不显眼的小字入口，默认折叠 */
+.local-box { margin: 22px 0 8px; text-align: center; }
+.local-head {
+  display: inline-flex; align-items: center; gap: 6px; cursor: pointer;
+  -webkit-user-select: none; user-select: none;
+  font-size: 10px; color: var(--muted); padding: 3px 10px; border-radius: 999px;
+  border: 1px dashed rgba(150, 150, 150, .35); background: transparent; opacity: .5;
+  transition: opacity .2s;
+}
+.local-head:active { opacity: .32; }
+.local-count {
+  font-size: 10px; font-weight: 500; color: var(--muted);
+  background: rgba(150, 150, 150, .14); padding: 0 6px; border-radius: 999px;
+}
+.local-arrow { font-size: 9px; transition: transform .2s; }
+.local-head.closed .local-arrow { transform: rotate(-90deg); }
+.local-body {
+  margin-top: 14px; text-align: left;
+  background: #fff; border: 1px solid var(--line, #e6e8eb); border-radius: 14px;
+  padding: 16px 14px; box-shadow: 0 2px 12px rgba(0,0,0,.06);
+}
+body.dim .local-body {
+  background: #1a1d25; border-color: rgba(255,255,255,.12); box-shadow: 0 2px 14px rgba(0,0,0,.22);
+}
+body.dim .local-body .field label { color: #e4e8ee; }
+body.dim .local-body .local-tip { color: #aeb4be; }
+.local-tip { font-size: 12px; color: var(--muted); line-height: 1.7; margin: 0 0 12px; }
+.local-list { margin-top: 14px; }
+.local-row { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-top: 1px solid var(--line); }
+.local-row-ic {
+  width: 32px; height: 32px; border-radius: 9px; object-fit: cover; flex: none; background: var(--bg);
+}
+.local-row-main { flex: 1; min-width: 0; }
+.local-row-title { font-size: 14px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.local-row-url { font-size: 11px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mini-btn {
+  font-size: 12px; padding: 4px 10px; border-radius: 8px; border: 1px solid var(--line);
+  background: transparent; color: var(--muted); flex: none; cursor: pointer;
+}
+.mini-btn:active { opacity: .6; }
+.link-local-badge {
+  display: inline-block; font-size: 10px; font-weight: 600; color: var(--green);
+  border: 1px solid rgba(var(--green-rgb, 7, 193, 96), .35); padding: 0 5px;
+  border-radius: 999px; margin-left: 6px; vertical-align: 2px;
+}
+.link-del {
+  font-size: 11px; padding: 3px 9px; border-radius: 8px; border: 1px solid var(--line);
+  background: transparent; color: var(--muted); cursor: pointer; flex: none;
+}
+.link-del:active { opacity: .6; }
+
+/* 公开端「本地新建内容」：低调但比「本地快捷方式」更显眼（绿色药丸，仍小而克制） */
+.local-post-box { margin: 18px 0 6px; text-align: right; }
+.local-post-trigger {
+  font-size: 12px; color: var(--green); opacity: .82; background: rgba(7, 193, 96, .08);
+  border: 1px solid rgba(7, 193, 96, .35); border-radius: 999px; padding: 5px 12px; cursor: pointer;
+  font-weight: 600; -webkit-tap-highlight-color: transparent;
+}
+.local-post-trigger:active { opacity: .6; }
+body.dim .local-post-trigger { background: rgba(7, 193, 96, .16); border-color: rgba(7, 193, 96, .5); color: #5cd99a; }
+.local-post-body {
+  text-align: left; margin-top: 10px; padding: 14px; border-radius: 14px;
+  background: var(--card); box-shadow: 0 2px 12px rgba(0,0,0,.06);
+}
+.local-post-body .row { margin: 4px 0 0; }
+.local-post-body .local-tip { margin: 10px 0 0; }
+
+/* 紧凑气泡（黑科技文章列表）：缩小内距与字号，摘要只留一行，少占屏幕 */
+.card.slim { padding: 12px 14px; margin-bottom: 10px; gap: 10px; }
+.card.slim .card-title { font-size: 15px; margin-bottom: 2px; }
+.card.slim .card-title .tag { font-size: 10px; padding: 1px 7px; margin-right: 5px; vertical-align: 2px; }
+.card.slim .card-desc { -webkit-line-clamp: 1; font-size: 12px; }
+
+/* ---------- Detail overlay ---------- */
+.overlay {
+  position: fixed; inset: 0; background: #fff; z-index: 50;
+  display: none; flex-direction: column; max-width: var(--maxw); margin: 0 auto;
+}
+.overlay.show { display: flex; }
+.overlay-bar {
+  display: flex; align-items: center; gap: 12px; padding: 14px 16px;
+  border-bottom: 1rpx solid var(--line); position: sticky; top: 0; background: #fff; z-index: 2;
+}
+.overlay-bar .back { font-size: 22px; background: none; border: none; color: var(--text); line-height: 1; }
+.overlay-bar .ov-title { font-weight: 600; font-size: 16px; }
+.overlay-scroll { overflow: auto; padding: 20px 18px 48px; flex: 1; }
+.article-cover { width: 100%; border-radius: 12px; margin-bottom: 16px; background: #f0f1f3; }
+/* 横屏宽幅封面：统一 16:9 通栏 + 红色边框 */
+.article-cover.land { aspect-ratio: 16 / 9; object-fit: cover; border: 2px solid rgba(229,57,53,.55); box-sizing: border-box; }
+.article-h1 { font-size: 23px; line-height: 1.35; font-weight: 700; margin: 0 0 10px; }
+.article-meta {
+  color: var(--muted); font-size: 12px; margin-bottom: 18px; padding-bottom: 14px;
+  border-bottom: 1px solid var(--line);
+}
+.article-content {
+  white-space: pre-wrap; word-break: break-word; font-size: 16px; line-height: 1.85;
+  color: var(--text); letter-spacing: .2px;
+}
+.article-content img { max-width: 100%; border-radius: 10px; margin: 6px 0; }
+
+/* 分段切换控件（封面展示方式等）：左图右文式切换 */
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; width: 100%; }
+.seg button {
+  flex: 1; border: none; background: #fafbfc; color: var(--muted); padding: 9px 8px;
+  font-size: 13px; cursor: pointer; font-family: inherit; transition: background .15s, color .15s;
+}
+.seg button + button { border-left: 1px solid var(--line); }
+.seg button.active { background: var(--green); color: #fff; font-weight: 600; }
+.seg button:active { opacity: .8; }
+
+/* ---------- Tools ---------- */
+/* 黑科技栏「小工具」磁贴：两列网格，点按在弹窗打开工具，保持栏目整洁 */
+.tools-tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 4px 0; }
+.tool-tile {
+  background: var(--card-bg, var(--card)); border: 1px solid var(--line); border-radius: 12px;
+  padding: 14px 10px; text-align: center; font-size: 13px; font-weight: 600; color: var(--text);
+  cursor: pointer; -webkit-tap-highlight-color: transparent; line-height: 1.3;
+}
+.tool-tile:active { transform: scale(.98); }
+body.dim .tool-tile {
+  background: var(--card-bg, rgba(24, 27, 36, .4)); border-color: rgba(255, 255, 255, .12);
+  color: #f2f4f8; box-shadow: 0 2px 12px rgba(0, 0, 0, .2);
+  backdrop-filter: blur(var(--dim-blur, 8px)); -webkit-backdrop-filter: blur(var(--dim-blur, 8px));
+}
+/* 小工具弹窗：与文章详情同款全屏浮层，暗调下磨砂玻璃 */
+/* 小工具气泡框：居中浮层，尺寸随工具内容自适应（不占满全屏） */
+.tool-pop-mask {
+  position: fixed; inset: 0; background: rgba(0, 0, 0, .42); z-index: 60;
+  display: none;
+}
+.tool-pop-mask.show { display: block; }
+.tool-pop {
+  position: fixed; z-index: 61; left: 50%; top: 50%;
+  transform: translate(-50%, -50%) scale(.96);
+  width: auto; min-width: 280px; max-width: 92vw; max-height: 82vh; overflow: hidden;
+  display: flex; flex-direction: column;
+  background: #ffffff; border-radius: 18px; border: 1px solid rgba(0, 0, 0, .06);
+  /* 气泡自带文字色，不依赖全局 --text（暗调下 --text 仍是深色，会导致标题/计时看不清） */
+  color: #1f2329;
+  box-shadow: 0 14px 44px rgba(0, 0, 0, .22);
+  opacity: 0; visibility: hidden; transition: opacity .18s ease, transform .18s ease;
+  will-change: opacity, transform;
+}
+.tool-pop.show { opacity: 1; visibility: visible; transform: translate(-50%, -50%) scale(1); }
+.tool-pop-bar {
+  display: flex; align-items: center; gap: 10px; padding: 12px 14px;
+  border-bottom: 1px solid rgba(0, 0, 0, .06); background: #ffffff;
+  color: #1f2329;
+  position: sticky; top: 0; z-index: 2; flex: none;
+}
+.tool-pop-bar .tp-title { font-weight: 600; font-size: 15px; flex: 1; color: #1f2329; }
+.tool-pop-bar .tp-close { font-size: 22px; line-height: 1; background: none; border: none; color: #8a8f99; cursor: pointer; padding: 0 4px; }
+.tool-pop-body { padding: 16px; overflow: auto; width: min(420px, 90vw); color: #1f2329; }
+/* 气泡内不再重复包一层卡片，工具内容直接铺在气泡里，尺寸随工具自适应 */
+.tool-pop-body .tool { background: transparent; box-shadow: none; padding: 0; margin: 0; }
+/* 暗调主题：气泡背景为实色深底（非玻璃），标题/正文/计时必须改为亮色，否则与背景同色看不清 */
+body.dim .tool-pop { background: #1a1d25; border: 1px solid rgba(255, 255, 255, .08); color: #f2f4f8; }
+body.dim .tool-pop-bar { background: #1a1d25; border-bottom: 1px solid rgba(255, 255, 255, .1); color: #f4f6f9; }
+body.dim .tool-pop-bar .tp-title { color: #f4f6f9; }
+body.dim .tool-pop-bar .tp-close { color: #aab0ba; }
+body.dim .tool-pop-body { color: #f2f4f8; }
+body.dim .tool-pop-body .tool { background: transparent; box-shadow: none; }
+.tool {
+  /* 内容气泡透明度同样作用于黑科技·小工具面板（--card-bg） */
+  background: var(--card-bg, var(--card)); border-radius: 14px; padding: 16px; margin-bottom: 14px;
+  box-shadow: 0 2px 10px rgba(0,0,0,.04);
+}
+.tool h3 { margin: 0 0 12px; font-size: 16px; display: flex; align-items: center; gap: 8px; }
+textarea, input[type=text], input[type=password], input[type=number], select {
+  width: 100%; border: 1rpx solid var(--line); border-radius: 10px; padding: 10px 12px;
+  font-size: 14px; font-family: inherit; background: #fafbfc; color: var(--text);
+}
+textarea { min-height: 90px; resize: vertical; }
+.row { display: flex; gap: 10px; margin-top: 10px; flex-wrap: wrap; }
+.btn {
+  border: none; border-radius: 10px; padding: 10px 16px; font-size: 14px; font-weight: 600;
+  background: var(--green); color: #fff;
+}
+.btn.ghost { background: #eef0f2; color: var(--text); }
+.btn.danger { background: var(--danger); }
+.btn:active { transform: translateY(1px); }
+.out {
+  margin-top: 10px; background: #0f1115; color: #d6f5e3; border-radius: 10px; padding: 12px;
+  font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 13px; white-space: pre-wrap;
+  word-break: break-all; min-height: 20px;
+}
+
+/* ---------- Install banner ---------- */
+.install-banner {
+  display: none; align-items: center; gap: 12px; margin: 0 16px 14px;
+  background: var(--green); color: #fff; border-radius: 12px; padding: 12px 14px;
+}
+.install-banner.show { display: flex; }
+.install-banner .ib-text { flex: 1; font-size: 13px; }
+.install-banner .btn { background: #fff; color: var(--green); padding: 8px 14px; }
+
+/* ---------- Admin ---------- */
+.admin-wrap { max-width: 560px; margin: 0 auto; padding: 24px 16px 60px; }
+.login-box {
+  max-width: 360px; margin: 18vh auto 0; background: #fff; border-radius: 16px; padding: 28px 22px;
+  box-shadow: 0 4px 20px rgba(0,0,0,.06);
+}
+.login-box h2 { margin: 0 0 6px; }
+.login-box p { color: var(--muted); font-size: 13px; margin: 0 0 18px; }
+.login-hint { color: var(--muted); font-size: 12px; line-height: 1.5; margin: 14px 0 0; padding: 10px 12px; background: rgba(0,0,0,.03); border-radius: 10px; }
+.field { margin-bottom: 14px; }
+.field label { display: block; font-size: 13px; margin-bottom: 6px; font-weight: 600; }
+.admin-bar {
+  position: sticky; top: 0; z-index: 10; background: #fff; border-bottom: 1rpx solid var(--line);
+  padding: 12px 16px; display: flex; align-items: center; gap: 12px;
+}
+.admin-bar .ab-title { font-weight: 700; font-size: 16px; flex: 1; }
+.admin-tabs { display: flex; gap: 6px; padding: 12px 16px 0; }
+.admin-tabs .tab { flex: none; padding: 8px 16px; }
+.admin-list { padding: 12px 16px; }
+.empty { text-align: center; color: var(--muted); padding: 40px 0; }
+.modal-mask {
+  position: fixed; inset: 0; background: rgba(0,0,0,.45); z-index: 60; display: none;
+  align-items: flex-end; justify-content: center;
+}
+.modal-mask.show { display: flex; }
+.modal {
+  background: #fff; width: 100%; max-width: var(--maxw); border-radius: 18px 18px 0 0;
+  max-height: 92vh; overflow: auto; padding: 20px 18px 28px;
+}
+.modal h3 { margin: 0 0 16px; }
+.modal .close { float: right; background: none; border: none; font-size: 22px; color: var(--muted); }
+.cover-preview { width: 100%; max-height: 180px; object-fit: contain; border-radius: 10px; background: #f0f0f0; margin-top: 8px; }
+.checkbox-row { display: flex; align-items: center; gap: 8px; margin: 12px 0; font-size: 14px; }
+.help { font-size: 12px; color: var(--muted); margin-top: 6px; }
+.sw-version-box { margin-top: 14px; padding: 12px 14px; border: 1px solid var(--line, #e6e8eb); border-radius: 12px; background: rgba(0,0,0,.03); }
+.sw-version-box h4 { margin: 0 0 8px; font-size: 14px; }
+.sw-version-box b { color: var(--green); }
+body.dim .sw-version-box { background: rgba(255,255,255,.06); border-color: rgba(255,255,255,.14); }
+body.admin-dark .sw-version-box { background: rgba(255,255,255,.06); border-color: rgba(255,255,255,.14); }
+.sub { font-size: 14px; font-weight: 700; margin: 18px 0 10px; }
+.color-row { display: flex; flex-wrap: wrap; gap: 14px; }
+.color-item { display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600; }
+.color-item input[type=color] { width: 60px; height: 40px; padding: 2px; border: 1rpx solid var(--line); border-radius: 8px; background: #fff; }
+input[type=range] { width: 100%; accent-color: var(--green); }
+.tool-toggles { display: flex; flex-wrap: wrap; gap: 10px; }
+.tool-toggle {
+  display: flex; align-items: center; gap: 6px; background: #fafbfc; border: 1rpx solid var(--line);
+  border-radius: 999px; padding: 8px 12px; font-size: 13px;
+}
+.tool-toggle input { accent-color: var(--green); }
+.link-item { cursor: pointer; text-decoration: none; color: inherit; -webkit-tap-highlight-color: transparent; }
+.link-item:visited { color: inherit; }
+.link-item:active { transform: scale(.99); }
+.link-group { margin-bottom: 4px; }
+/* 合集折叠头：做成药丸按钮样式，一眼可知可点击展开/收拢 */
+.link-group-head {
+  display: flex; align-items: center; gap: 8px; margin: 16px 2px 10px;
+  cursor: pointer; user-select: none; -webkit-user-select: none;
+  background: var(--card-bg, var(--card)); border: 1rpx solid var(--line);
+  border-radius: 999px; padding: 10px 14px;
+  box-shadow: 0 2px 8px rgba(0,0,0,.04);
+}
+.link-group-head:active { transform: scale(.99); }
+.link-group-title { font-size: 14px; font-weight: 700; color: var(--text); margin: 0; padding-left: 4px; flex: 1; }
+.link-group-count {
+  font-size: 11px; font-weight: 600; color: var(--green); flex: none;
+  background: rgba(var(--green-rgb, 7, 193, 96), .14); padding: 2px 9px; border-radius: 999px;
+}
+.link-group-arrow { color: var(--muted); font-size: 11px; flex: none; transition: transform .2s; }
+.link-group-head.closed .link-group-arrow { transform: rotate(-90deg); }
+.link-group-sel { font-size: 13px; padding: 5px 8px; border-radius: 8px; border: 1px solid var(--line); background: #fff; max-width: 160px; }
+/* 热门工具图标与介绍 */
+.link-ic { width: 28px; height: 28px; border-radius: 8px; object-fit: cover; }
+.link-ic-wrap { display: flex; align-items: center; margin-bottom: 6px; }
+.link-ic-mini { margin-bottom: 6px; }
+
+/* 公开端「关于」页隐藏的作者入口 + 作者面板 */
+.author-entry {
+  display: block; margin: 26px auto 0; background: none; border: none;
+  color: var(--text); font-size: 13px; letter-spacing: 1px; opacity: .82; cursor: pointer;
+}
+.author-entry:active { opacity: 1; }
+.author-panel { margin-top: 14px; }
+.author-card {
+  background: var(--card); border-radius: 14px; padding: 18px 16px;
+  box-shadow: 0 2px 12px rgba(0,0,0,.05);
+}
+.author-name { font-weight: 700; font-size: 16px; margin-bottom: 8px; color: var(--green); }
+.author-intro { font-size: 14px; line-height: 1.75; color: var(--text); }
+/* 关于页底部版本号：V + 数字，低调居中，随 SW 部署版本同步 */
+.app-version {
+  margin: 26px 0 12px; text-align: center;
+  font-size: 14px; font-weight: 700; letter-spacing: 1px; color: var(--green, #07c160); opacity: 1;
+}
+.admin-mini {
+  display: inline-block; margin-top: 16px; width: 34px; height: 34px; line-height: 34px;
+  text-align: center; border-radius: 10px; background: var(--green); color: #fff;
+  font-size: 13px; text-decoration: none;
+}
+.admin-mini:active { opacity: .85; }
+
+/* 后台作者介绍 textarea */
+.auth-textarea {
+  width: 100%; border: 1rpx solid var(--line); border-radius: 10px; padding: 10px;
+  font-size: 14px; font-family: inherit; min-height: 96px; resize: vertical;
+}
+.tool-note {
+  white-space: pre-wrap; line-height: 1.7; color: var(--text); font-size: 14px;
+  background: var(--card-bg, var(--card)); border-radius: 10px; padding: 14px; margin: 0;
+}
+.tool-toggle { cursor: pointer; }
+.tool-row .row { margin: 0; }
+.toast {
+  position: fixed; left: 50%; bottom: 40px; transform: translateX(-50%);
+  background: #1f2329; color: #fff; padding: 10px 18px; border-radius: 999px; font-size: 13px;
+  z-index: 80; opacity: 0; transition: opacity .2s; pointer-events: none;
+}
+.toast.show { opacity: 1; }
+
+/* 更新后「已更新最新版本」小气泡：顶部居中、小巧、自动消失，不占屏、只出现一次 */
+#versionToast {
+  position: fixed; left: 50%; top: 14px; transform: translateX(-50%) translateY(-10px);
+  background: rgba(31,35,41,.94); color: #fff; padding: 7px 15px; border-radius: 999px;
+  font-size: 12px; font-weight: 500; z-index: 220; opacity: 0; white-space: nowrap;
+  pointer-events: none; box-shadow: 0 4px 18px rgba(0,0,0,.28); transition: opacity .25s, transform .25s;
+}
+#versionToast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+body.dim #versionToast { background: rgba(20,23,30,.95); }
+
+/* 公开端「安装」标签页 */
+.install-card {
+  background: var(--card); border-radius: 14px; padding: 16px; margin-bottom: 14px;
+  box-shadow: 0 2px 12px rgba(0,0,0,.05);
+}
+.install-url {
+  word-break: break-all; background: var(--bg); padding: 9px 11px; border-radius: 8px;
+  font-size: 12px; margin: 10px 0; color: var(--text);
+}
+.qr { text-align: center; margin: 12px 0 4px; }
+.qr img { width: 180px; height: 180px; border-radius: 10px; background: #fff; padding: 6px; }
+.steps .step {
+  background: var(--card); border-radius: 12px; padding: 12px 14px; margin-bottom: 10px;
+  font-size: 13px; line-height: 1.7; box-shadow: 0 2px 12px rgba(0,0,0,.05);
+}
+.steps .step b { color: var(--green); }
+
+/* 关于页「安装 APP」区块 */
+.install-mini {
+  background: var(--card); border-radius: 14px; padding: 18px 16px; margin: 6px 0 16px;
+  box-shadow: 0 2px 12px rgba(0,0,0,.05); text-align: center;
+}
+.install-top { display: flex; align-items: center; gap: 12px; text-align: left; margin-bottom: 14px; }
+.install-icon {
+  width: 46px; height: 46px; border-radius: 12px; flex: none;
+  background: rgba(var(--green-rgb, 7, 193, 96), .12);
+  display: flex; align-items: center; justify-content: center; font-size: 24px;
+}
+.install-head { text-align: left; }
+.install-name { font-size: 16px; font-weight: 700; color: var(--text); }
+.install-sub { font-size: 13px; color: var(--muted); line-height: 1.6; margin-top: 3px; }
+.install-actions { display: flex; flex-direction: column; gap: 10px; }
+.install-app-btn {
+  width: 100%; font-size: 15px; padding: 13px; font-weight: 600;
+}
+.apk-link {
+  display: inline-block; width: 100%; margin-top: 0; text-decoration: none;
+  box-sizing: border-box; text-align: center;
+}
+.qr-wrap { margin-top: 16px; }
+
+/* ===== 后台实时预览遮罩 ===== */
+.preview-overlay {
+  position: fixed; inset: 0; z-index: 70; background: #0f1115;
+  display: none; flex-direction: column;
+}
+.preview-overlay.show { display: flex; }
+.preview-bar {
+  flex: none; display: flex; align-items: center; gap: 10px; padding: 10px 14px;
+  background: #1a1d23; color: #e6e8eb; box-shadow: 0 2px 10px rgba(0,0,0,.3);
+}
+.preview-title { flex: 1; font-size: 13px; font-weight: 600; }
+.preview-actions { display: flex; gap: 8px; flex: none; }
+.preview-frame {
+  flex: 1; width: 100%; border: 0; background: var(--bg);
+}
+/* 后台栏「预览」按钮高亮 */
+.admin-bar #previewBtn { color: var(--green); border-color: var(--green); }
+
+/* ===== 网站计数小条（低调灰字，不抢眼） ===== */
+.stat-bar {
+  display: flex; gap: 14px; justify-content: center; align-items: center;
+  padding: 12px 12px 18px; font-size: 11px; color: #9aa0a6; background: transparent;
+  letter-spacing: .2px;
+}
+.stat-bar b { color: #6b7280; font-weight: 600; font-variant-numeric: tabular-nums; }
+
+/* ===== 暗调模式（深色但不过黑）：整张背景图压暗 + 顶栏通透 + 三个切换按钮转暗玻璃/亮绿 + 气泡卡片玻璃 + 文字自动变浅便于阅读 ===== */
+body.dim {
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+/* 关键：暗调模式下给壁纸叠加暗色蒙版，整张背景图随之变暗（接近系统深色模式效果）。
+   这样卡片与文字无论透不透明都落在暗底上，对比度充足、清晰可读；蒙版强度由后台「暗调强度」调节 */
+body.dim.has-wallpaper .wallpaper::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(13, 15, 21, var(--dim-scrim, .72));
+  pointer-events: none;
+}
+/* 顶部标题栏在暗调下不做实块，露出被压暗的壁纸，更通透（仅下方三个切换按钮转暗玻璃/亮绿） */
+body.dim .header {
+  background: transparent;
+  color: var(--text);
+  border-bottom-color: rgba(255, 255, 255, .06);
+}
+body.dim.has-wallpaper .header { background: transparent; }
+/* 品牌标题 / 副标题提亮 */
+body.dim .brand { color: #f4f6f9; }
+body.dim .brand .dot { box-shadow: 0 0 0 3px rgba(var(--green-rgb, 7, 193, 96), .25); }
+body.dim .brand-sub { color: #aab0ba; }
+
+/* 三个区块选项（文章 / 黑科技 / 关于）：未选 = 暗调玻璃胶囊，选中 = 亮绿填充并发光，肉眼可辨地"整块变" */
+body.dim .tabs { gap: 8px; }
+body.dim .tabs .tab {
+  background: var(--tab-dim-bg, rgba(255, 255, 255, .07));
+  color: rgba(255, 255, 255, .66);
+  border-color: rgba(255, 255, 255, .12);
+  backdrop-filter: blur(var(--tab-dim-blur, 6px));
+  -webkit-backdrop-filter: blur(var(--tab-dim-blur, 6px));
+  transition: background .2s, color .2s, border-color .2s, box-shadow .2s;
+}
+body.dim .tabs .tab:active { background: rgba(255, 255, 255, .13); }
+body.dim .tabs .tab.active {
+  background: var(--green);
+  color: #fff;
+  border-color: var(--green);
+  box-shadow: 0 3px 12px rgba(var(--green-rgb, 7, 193, 96), .42);
+}
+
+/* 区块标题：文字提亮 + 阴影，暗底上醒目 */
+body.dim .section-title { color: #eef1f5; text-shadow: 0 1px 6px rgba(0, 0, 0, .55); }
+body.dim .section-title::before { background: var(--green); box-shadow: 0 0 8px rgba(var(--green-rgb, 7, 193, 96), .5); }
+
+/* 气泡卡片：暗调玻璃（透明度由后台「暗调气泡卡片透明度」控制）+ 细描边 + 轻投影 + 轻模糊，通透有层次、能看到背景 */
+body.dim .card,
+body.dim .tool,
+body.dim .install-mini,
+body.dim .install-card,
+body.dim .author-card,
+body.dim .link-group-head {
+  background: var(--card-bg, rgba(24, 27, 36, .35));
+  border: 1px solid rgba(255, 255, 255, .12);
+  box-shadow: 0 2px 14px rgba(0, 0, 0, .22);
+  backdrop-filter: saturate(140%) blur(var(--dim-blur, 8px));
+  -webkit-backdrop-filter: saturate(140%) blur(var(--dim-blur, 8px));
+}
+/* 卡片内文字：标题近白、描述舒适浅灰，确保清晰可读 */
+body.dim .card-title { color: #f4f6f9; font-weight: 600; }
+body.dim .card-desc { color: #aeb4be; }
+body.dim .article-h1, body.dim .article-content, body.dim .about-text { color: #eef1f5; }
+body.dim .author-entry { color: #d6dae2; opacity: .9; }
+body.dim .author-intro { color: #d6dae2; }
+body.dim .article-meta { color: #9aa1ac; }
+body.dim .tool-note { color: #eef1f5; background: rgba(26, 29, 37, .55); }
+
+/* 次级按钮、输入框在暗底上转暗描边，保证可读 */
+body.dim .btn.ghost { background: rgba(255, 255, 255, .10); color: #eef1f5; border-color: rgba(255, 255, 255, .16); }
+body.dim .btn.ghost:active { opacity: .72; }
+body.dim input, body.dim textarea, body.dim select {
+  background: rgba(255, 255, 255, .06); color: #eef1f5; border-color: rgba(255, 255, 255, .14);
+}
+body.dim input::placeholder, body.dim textarea::placeholder { color: rgba(255, 255, 255, .4); }
+
+/* 暗调下：本地发帖表单卡片改为暗色玻璃，并同步标签/提示/分段控件配色，
+   避免「浅色卡片 + 浅色输入文字」导致根本看不清输入了什么 */
+body.dim .local-post-body {
+  background: var(--card-bg, rgba(24, 27, 36, .55));
+  box-shadow: 0 2px 14px rgba(0, 0, 0, .35);
+}
+body.dim .local-post-body .field label { color: #e4e8ee; }
+body.dim .local-post-body .local-tip { color: #aeb6c2; }
+body.dim .local-post-body .checkbox-row { color: #e4e8ee; }
+body.dim .local-post-body .seg { background: rgba(255, 255, 255, .06); }
+body.dim .local-post-body .seg button { color: #aeb6c2; }
+body.dim .local-post-body .cover-preview { background: rgba(255, 255, 255, .06); }
+
+/* 详情页（点击卡片打开的全屏页）：暗调下改为磨砂玻璃，露出被压暗的壁纸，整体更通透、不死黑 */
+body.dim .overlay {
+  background: rgba(15, 18, 24, .76);
+  backdrop-filter: blur(14px) saturate(150%);
+  -webkit-backdrop-filter: blur(14px) saturate(150%);
+}
+body.dim .overlay-bar {
+  background: rgba(15, 18, 24, .5);
+  backdrop-filter: blur(14px) saturate(150%);
+  -webkit-backdrop-filter: blur(14px) saturate(150%);
+  border-bottom-color: rgba(255, 255, 255, .08);
+}
+
+/* 标签（文章/黑科技角标）在暗底上换成更亮的同色系，便于识别 */
+body.dim .tag { background: rgba(7, 193, 96, .22); color: #58d994; }
+body.dim .tag.tech { background: rgba(64, 120, 242, .24); color: #84a9ff; }
+body.dim .pin-flag { color: #58d994; }
+
+/* 二维码保持白底，确保可扫 */
+body.dim .qr img { background: #fff; }
+body.dim .local-head { border-color: rgba(255, 255, 255, .22); color: #aeb4be; }
+body.dim .link-group-head { border-color: rgba(255, 255, 255, .12); }
+body.dim .link-group-title { color: #eef1f5; }
+body.dim .link-group-count { background: rgba(var(--green-rgb, 7, 193, 96), .20); color: #58d994; }
+body.dim .out { background: #05070a; }
+body.dim .install-banner { box-shadow: 0 4px 18px rgba(0, 0, 0, .4); }
+
+/* 微信内下载引导提示（扫码/微信打开时直下 apk 会被拦截，提示用浏览器打开） */
+.wx-tip {
+  margin: 10px 0 2px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: #8a5a00;
+  background: rgba(255, 193, 7, .16);
+  border: 1px solid rgba(255, 193, 7, .4);
+}
+.wx-tip b { color: inherit; }
+/* 苹果设备「添加到主屏幕」引导提示 */
+.ios-tip {
+  margin: 10px 0 2px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: #0a5bd6;
+  background: rgba(10, 91, 214, .12);
+  border: 1px solid rgba(10, 91, 214, .35);
+}
+.ios-tip b { color: inherit; }
+body.dim .ios-tip { color: #7fb0ff; background: rgba(10, 91, 214, .14); border-color: rgba(10, 91, 214, .35); }
+body.dim .wx-tip { color: #ffd766; background: rgba(255, 193, 7, .12); border-color: rgba(255, 193, 7, .3); }
+/* 扫码引导进入时，一键安装按钮高亮脉冲，方便用户立即定位 */
+@keyframes focusPulse {
+  0% { box-shadow: 0 0 0 0 rgba(7, 193, 96, .55); }
+  70% { box-shadow: 0 0 0 12px rgba(7, 193, 96, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(7, 193, 96, 0); }
+}
+.focus-pulse { animation: focusPulse 1.4s ease-out 2; border-radius: 12px; }
+
+/* ===== 公开端「关于」页外观主题切换开关 ===== */
+.theme-sw-card {
+  margin: 0 0 14px;
+  padding: 12px 14px;
+  background: var(--card-bg, rgba(255, 255, 255, .72));
+  border: 1px solid rgba(255, 255, 255, .55);
+  border-radius: 14px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, .08);
+  backdrop-filter: saturate(150%) blur(10px);
+  -webkit-backdrop-filter: saturate(150%) blur(10px);
+}
+.ts-row { display: flex; align-items: center; gap: 10px; }
+.ts-ic { font-size: 18px; }
+.ts-label { font-weight: 600; color: var(--text, #1f2329); flex: 0 0 auto; }
+.ts-mode { font-size: 13px; color: var(--muted, #8a8f99); flex: 1 1 auto; }
+.ts-tip { margin: 8px 0 0; font-size: 12px; color: var(--muted, #8a8f99); line-height: 1.5; }
+/* 开关（浅色/暗调） */
+.switch { position: relative; display: inline-block; width: 46px; height: 26px; flex: 0 0 auto; }
+.switch input { opacity: 0; width: 0; height: 0; }
+.switch .slider {
+  position: absolute; cursor: pointer; inset: 0;
+  background: rgba(120, 130, 145, .45); border-radius: 26px; transition: .25s;
+}
+.switch .slider:before {
+  content: ""; position: absolute; height: 20px; width: 20px; left: 3px; top: 3px;
+  background: #fff; border-radius: 50%; transition: .25s; box-shadow: 0 1px 3px rgba(0, 0, 0, .3);
+}
+.switch input:checked + .slider { background: var(--green, #07c160); }
+.switch input:checked + .slider:before { transform: translateX(20px); }
+/* 暗调下主题开关卡片同步玻璃质感 */
+body.dim .theme-sw-card {
+  background: rgba(24, 27, 36, .55);
+  border-color: rgba(255, 255, 255, .12);
+  box-shadow: 0 4px 18px rgba(0, 0, 0, .35);
+}
+body.dim .ts-label { color: #f2f4f7; }
+
+/* ===== 后台暗调开关：后台界面自身套用暗调 =====
+   与公开端完全同一套观感：压暗的壁纸 + 烟灰半透明玻璃 + 白色文字层级 + 亮绿强调。
+   复用 body.dim 注入的壁纸蒙版 / 玻璃变量，再把后台专属控件（顶栏、导航、折叠组、表单、弹窗）
+   全部转成同款通透玻璃，不再用任何实色深灰块。 */
+/* 壁纸蒙版兜底：即使 body.dim 未命中，后台暗调也压暗整张壁纸（强度随「暗调强度」联动） */
+body.admin-dark.has-wallpaper .wallpaper::after {
+  content: ''; position: absolute; inset: 0;
+  background: rgba(13, 15, 21, var(--dim-scrim, .72));
+  pointer-events: none;
+}
+/* 页面底色压暗；无壁纸时也保持暗底，不会突然一片白 */
+body.admin-dark { background: #14171c; color: #eef1f5; }
+body.admin-dark #app { background: transparent; }
+
+/* 顶栏：通透暗玻璃（不做实黑块），露出压暗后的壁纸 */
+body.admin-dark .admin-bar {
+  background: rgba(20, 24, 32, .38);
+  border-bottom: 1px solid rgba(255, 255, 255, .08);
+  backdrop-filter: saturate(140%) blur(var(--dim-blur, 8px));
+  -webkit-backdrop-filter: saturate(140%) blur(var(--dim-blur, 8px));
+}
+body.admin-dark .ab-title { color: #f4f6f9; text-shadow: 0 1px 4px rgba(0, 0, 0, .5); }
+
+/* 导航按钮（内容 / 站点设置 / 工具栏 / 发布）：未选 = 雾白半透明玻璃，选中 = 亮绿发光（同公开端三按钮） */
+body.admin-dark .admin-tabs .tab {
+  background: var(--tab-dim-bg, rgba(255, 255, 255, .07));
+  color: rgba(255, 255, 255, .9);
+  border: 1px solid rgba(255, 255, 255, .16);
+  backdrop-filter: blur(var(--tab-dim-blur, 6px));
+  -webkit-backdrop-filter: blur(var(--tab-dim-blur, 6px));
+  text-shadow: 0 1px 3px rgba(0, 0, 0, .55);
+}
+body.admin-dark .admin-tabs .tab.active {
+  background: var(--green); color: #fff; border-color: var(--green);
+  box-shadow: 0 3px 12px rgba(var(--green-rgb, 7, 193, 96), .42);
+  text-shadow: none;
+}
+
+/* 折叠分组：烟灰半透明玻璃气泡（同公开端 .card），能透出压暗的壁纸 */
+body.admin-dark .coll-group {
+  background: var(--card-bg, rgba(24, 27, 36, .4));
+  border: 1px solid rgba(255, 255, 255, .12);
+  box-shadow: 0 4px 18px rgba(0, 0, 0, .28);
+  backdrop-filter: saturate(140%) blur(var(--dim-blur, 8px));
+  -webkit-backdrop-filter: saturate(140%) blur(var(--dim-blur, 8px));
+}
+body.admin-dark .coll-head { background: rgba(255, 255, 255, .06); color: #f2f4f8; }
+body.admin-dark .coll-head:hover { background: rgba(255, 255, 255, .1); }
+body.admin-dark .coll-arrow { color: #aeb6c2; }
+
+/* 表单输入框 / 文本域 / 下拉：暗玻璃底 + 细描边 + 白字，压暗壁纸上也清晰可读 */
+body.admin-dark input[type=text],
+body.admin-dark input[type=password],
+body.admin-dark input[type=number],
+body.admin-dark input[type=url],
+body.admin-dark textarea,
+body.admin-dark select,
+body.admin-dark .auth-textarea,
+body.admin-dark .link-group-sel {
+  background: rgba(18, 22, 30, .55);
+  color: #f4f6f9;
+  border: 1px solid rgba(255, 255, 255, .18);
+  backdrop-filter: blur(var(--dim-blur, 8px));
+  -webkit-backdrop-filter: blur(var(--dim-blur, 8px));
+}
+body.admin-dark input::placeholder,
+body.admin-dark textarea::placeholder { color: rgba(255, 255, 255, .42); }
+body.admin-dark .field label { color: #e4e8ee; text-shadow: 0 1px 3px rgba(0, 0, 0, .5); }
+body.admin-dark .sub { color: #f2f4f8; text-shadow: 0 1px 4px rgba(0, 0, 0, .5); }
+body.admin-dark .help { color: #aeb6c2; text-shadow: 0 1px 3px rgba(0, 0, 0, .5); }
+body.admin-dark .checkbox-row { color: #e4e8ee; }
+body.admin-dark .color-item { color: #e4e8ee; }
+body.admin-dark .empty { color: #aeb6c2; }
+body.admin-dark .tool h3 { color: #f2f4f8; }
+
+/* 次级按钮 / 分段控件 / 小按钮：暗玻璃 */
+body.admin-dark .btn.ghost {
+  background: rgba(255, 255, 255, .1); color: #f2f4f8;
+  border: 1px solid rgba(255, 255, 255, .16);
+  backdrop-filter: blur(var(--dim-blur, 8px));
+  -webkit-backdrop-filter: blur(var(--dim-blur, 8px));
+}
+body.admin-dark .btn.ghost:active { opacity: .72; }
+body.admin-dark .admin-bar #previewBtn { color: #4fd18b; border-color: rgba(79, 209, 139, .5); }
+body.admin-dark .seg { border-color: rgba(255, 255, 255, .14); }
+body.admin-dark .seg button { background: rgba(255, 255, 255, .06); color: #aeb6c2; border-color: rgba(255, 255, 255, .1); }
+body.admin-dark .seg button.active { background: var(--green); color: #fff; }
+body.admin-dark .tool-toggle { background: rgba(255, 255, 255, .08); border-color: rgba(255, 255, 255, .14); color: #e4e8ee; }
+body.admin-dark .mini-btn, body.admin-dark .link-del { background: rgba(255, 255, 255, .08); border-color: rgba(255, 255, 255, .16); color: #cfd6e0; }
+body.admin-dark .local-head { border-color: rgba(255, 255, 255, .22); color: #aeb6c2; }
+
+/* 颜色框 / 文件选择：暗底细边，避免亮白块刺眼 */
+body.admin-dark input[type=color] { background: rgba(18, 22, 30, .55); border-color: rgba(255, 255, 255, .18); }
+body.admin-dark input[type=file] { color: #cfd6e0; }
+body.admin-dark input[type=file]::file-selector-button {
+  background: rgba(255, 255, 255, .1); color: #f2f4f8;
+  border: 1px solid rgba(255, 255, 255, .16);
+  border-radius: 8px; padding: 6px 10px; margin-right: 8px; cursor: pointer;
+}
+body.admin-dark .cover-preview { background: rgba(255, 255, 255, .06); }
+body.admin-dark input[type=range] { accent-color: var(--green); }
+body.admin-dark input[type=checkbox] { accent-color: var(--green); }
+
+/* 弹窗 / 登录框 / 预览浮层：暗玻璃 */
+body.admin-dark .modal,
+body.admin-dark .login-box {
+  background: rgba(24, 28, 37, .88); color: #eef1f5;
+  border: 1px solid rgba(255, 255, 255, .12);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, .45);
+  backdrop-filter: saturate(140%) blur(16px);
+  -webkit-backdrop-filter: saturate(140%) blur(16px);
+}
+body.admin-dark .modal h3, body.admin-dark .login-box h2 { color: #f4f6f9; }
+body.admin-dark .modal .close { color: #aeb6c2; }
+body.admin-dark .login-box p, body.admin-dark .login-hint { color: #aeb6c2; }
+body.admin-dark .login-hint { background: rgba(255, 255, 255, .06); }
+body.admin-dark .preview-bar {
+  background: rgba(24, 28, 37, .88); color: #eef1f5;
+  border-bottom-color: rgba(255, 255, 255, .08);
+  backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+}
+body.admin-dark .preview-overlay { background: rgba(10, 12, 16, .9); }
+
+/* ===== 后台「站点设置」分组折叠（默认收纳，点标题展开） ===== */
+.coll-group {
+  margin: 12px 0; border: 1px solid #ebedf0; border-radius: 12px; overflow: hidden; background: #fff;
+}
+.coll-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 13px 14px; cursor: pointer; user-select: none;
+  font-weight: 700; color: #1f2329; background: #fafbfc;
+}
+.coll-head:hover { background: #f2f4f6; }
+.coll-arrow { font-size: 12px; color: #8a8f99; transition: transform .2s; }
+.coll-group.closed .coll-arrow { transform: rotate(-90deg); }
+.coll-body { padding: 6px 14px 14px; }
+.coll-body .sub:first-child { margin-top: 8px; }

@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>影视观看</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; background: #000; overflow: hidden; color: #fff;
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif; }
+  #bar { position: fixed; top: 0; left: 0; right: 0; height: 48px;
+    display: flex; align-items: center; gap: 8px; padding: 0 10px;
+    padding-top: env(safe-area-inset-top);
+    background: rgba(15, 17, 21, .82); backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px); z-index: 10; }
+  #bar .t { flex: 1; font-size: 14px; font-weight: 600; white-space: nowrap;
+    overflow: hidden; text-overflow: ellipsis; }
+  #bar button { border: none; background: rgba(255, 255, 255, .16); color: #fff;
+    font-size: 13px; padding: 7px 11px; border-radius: 9px; }
+  #bar button:active { background: rgba(255, 255, 255, .3); }
+  #fsBtn { background: #07c160 !important; font-weight: 700; }
+  #frame { position: fixed; top: 48px; left: 0; right: 0; bottom: 0;
+    width: 100%; height: calc(100% - 48px); border: 0; background: #000; }
+  #hint { position: fixed; left: 50%; transform: translateX(-50%); bottom: 18px;
+    background: rgba(0, 0, 0, .62); color: #fff; font-size: 12px;
+    padding: 8px 14px; border-radius: 20px; z-index: 10; opacity: 0;
+    transition: opacity .3s; pointer-events: none; max-width: 90%; text-align: center; }
+  #hint.show { opacity: 1; }
+  /* 横屏全屏：让 iframe 充满横屏视口 */
+  #bar:fullscreen { display: none; }
+  #frame:fullscreen { top: 0; height: 100%; }
+</style>
+</head>
+<body>
+<div id="bar">
+  <button id="backBtn">‹ 返回</button>
+  <div class="t" id="title">影视</div>
+  <button id="refreshBtn">刷新</button>
+  <button id="fsBtn">横屏全屏</button>
+</div>
+<iframe id="frame" allow="autoplay; encrypted-media; fullscreen; picture-in-picture; accelerometer; gyroscope"
+  referrerpolicy="no-referrer"
+  sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-presentation allow-modals"></iframe>
+<div id="hint">已尝试横屏全屏 · 若设备仍竖屏，请在系统中开启「自动旋转」</div>
+<script>
+  (function () {
+    var q = new URLSearchParams(location.search);
+    var url = q.get('url');
+    var name = q.get('name') || '影视';
+    document.getElementById('title').textContent = name;
+    var frame = document.getElementById('frame');
+    if (url) frame.src = url;
+    document.getElementById('backBtn').onclick = function () {
+      if (history.length > 1) history.back(); else location.href = './';
+    };
+    document.getElementById('refreshBtn').onclick = function () {
+      try { frame.contentWindow.location.reload(); } catch (e) { frame.src = frame.src; }
+    };
+    var hint = document.getElementById('hint');
+    function showHint() { hint.classList.add('show'); setTimeout(function () { hint.classList.remove('show'); }, 2800); }
+    document.getElementById('fsBtn').onclick = function () {
+      var el = document.documentElement;
+      var doFs = function () {
+        if (el.requestFullscreen) el.requestFullscreen().catch(function () {});
+        else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
+        if (screen.orientation && screen.orientation.lock) {
+          screen.orientation.lock('landscape').then(function () { showHint(); }).catch(function () { showHint(); });
+        } else { showHint(); }
+      };
+      doFs();
+    };
+    document.addEventListener('fullscreenchange', function () {
+      if (!document.fullscreenElement && screen.orientation && screen.orientation.unlock) {
+        try { screen.orientation.unlock(); } catch (e) {}
+      }
+    });
+    document.addEventListener('webkitfullscreenchange', function () {
+      if (!document.webkitFullscreenElement && screen.orientation && screen.orientation.unlock) {
+        try { screen.orientation.unlock(); } catch (e) {}
+      }
+    });
+  })();
+</script>
+</body>
+</html>

@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>预览 · 内容盒子</title>
+  <link rel="manifest" href="manifest.webmanifest?sharecode=AK6QIELR67" />
+  <link rel="icon" href="icon.svg?sharecode=AK6QIELR67" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="icon.svg?sharecode=AK6QIELR67" />
+  <link rel="stylesheet" href="css/style.css?sharecode=AK6QIELR67&pv=1" />
+</head>
+<body>
+  <div class="wallpaper" id="wallpaper" style="display: none;"></div>
+  <div class="app">
+    <header class="header">
+      <div class="header-inner">
+        <div class="brand">
+          <span class="dot"></span>
+          <span id="siteTitle">内容盒子</span>
+          <span class="brand-sub" id="siteDesc"></span>
+        </div>
+        <div class="tabs">
+          <button class="tab active" data-tab="article">文章</button>
+          <button class="tab" data-tab="tech">黑科技</button>
+          <button class="tab" data-tab="about">关于</button>
+        </div>
+      </div>
+    </header>
+
+    <div class="install-banner" id="installBanner" style="display:none">
+      <span class="ib-text">可安装到手机主屏幕，离线也能用</span>
+      <button class="btn" id="installBtn">安装</button>
+    </div>
+
+    <main class="main" id="main"></main>
+  </div>
+
+  <div class="overlay" id="overlay">
+    <div class="overlay-bar">
+      <button class="back" id="ovBack">‹</button>
+      <span class="ov-title">详情</span>
+    </div>
+    <div class="overlay-scroll" id="ovBody"></div>
+  </div>
+
+  <div class="tool-pop-mask" id="toolPopMask"></div>
+  <div class="tool-pop" id="toolPop">
+    <div class="tool-pop-bar">
+      <span class="tp-title" id="tpTitle">工具</span>
+      <button class="tp-close" id="tpClose" aria-label="关闭">×</button>
+    </div>
+    <div class="tool-pop-body" id="tpBody"></div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script src="js/store.js?sharecode=AK6QIELR67&pv=1"></script>
+  <script src="js/qrcode.js?sharecode=AK6QIELR67&pv=1"></script>
+  <script src="js/tools.js?sharecode=AK6QIELR67&pv=1"></script>
+  <script src="js/app.js?sharecode=AK6QIELR67&pv=1"></script>
+</body></html>

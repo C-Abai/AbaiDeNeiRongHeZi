@@ -1,0 +1,13 @@
+# 依赖（重新 npm install 即可恢复，不进版本库）
+node_modules/
+
+# 构建/下载产物
+app.apk
+
+# 历史临时文件（内容已并入 meta.json）
+meta.github.json
+
+# 系统/编辑器
+.DS_Store
+Thumbs.db
+*.log

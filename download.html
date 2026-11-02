@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>内容盒子 · 下载</title>
+<style>
+  *{box-sizing:border-box}
+  body{margin:0;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;
+       font-family:system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;
+       background:linear-gradient(160deg,#0f1115,#1b2230);color:#fff;text-align:center;padding:24px}
+  .box{max-width:340px}
+  .icon{font-size:54px;margin-bottom:10px}
+  .tip{opacity:.78;font-size:15px;line-height:1.7}
+  .sub{opacity:.5;font-size:13px;margin-top:14px}
+  .sub a{color:#43a047}
+</style>
+</head>
+<body>
+  <div class="box">
+    <div class="icon">📦</div>
+    <div class="tip">正在为你跳转下载「内容盒子」安装包…</div>
+    <div class="sub">若未自动开始，请<a id="fallback" href="#">点此手动下载</a></div>
+  </div>
+  <script>
+    (function () {
+      var apk = 'app.apk?sharecode=AK6QIELR67';
+      var fb = document.getElementById('fallback');
+      if (fb) fb.href = apk;
+      // 立即跳转，无任何外部统计脚本，不产生加载延迟
+      location.replace(apk);
+    })();
+  </script>
+</body>
+</html>
