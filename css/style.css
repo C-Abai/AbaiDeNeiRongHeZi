@@ -32,12 +32,21 @@ html, body {
 }
 body.has-wallpaper .app { background: transparent; }
 body.has-wallpaper .main { background: transparent; }
-body.has-wallpaper .header { background: rgba(255,255,255,.55); backdrop-filter: saturate(180%) blur(10px); }
+/* 壁纸模式：顶栏仍然跟随“主题”做磨砂玻璃，不随壁纸亮度变色，杜绝反转 */
+body.has-wallpaper .header,
+body.wallpaper-full .header {
+  background: rgba(245, 246, 248, 0.7);
+  backdrop-filter: saturate(180%) blur(10px);
+  -webkit-backdrop-filter: saturate(180%) blur(10px);
+}
 body.has-wallpaper .overlay { background: rgba(255,255,255,.92); }
-body.wallpaper-full .header { background: rgba(16,18,24,.42); border-bottom: none; backdrop-filter: saturate(160%) blur(12px); -webkit-backdrop-filter: saturate(160%) blur(12px); }
-body.wallpaper-full .brand { color: #fff; text-shadow: 0 1px 4px rgba(0,0,0,.55); }
-body.wallpaper-full .brand-sub { color: rgba(255,255,255,.85); text-shadow: 0 1px 4px rgba(0,0,0,.55); }
-body.wallpaper-full .brand .dot { box-shadow: 0 1px 4px rgba(0,0,0,.5); }
+/* 暗调 + 壁纸下品牌文字提亮以保证对比（浅色主题保持默认深色文字） */
+body.dim.has-wallpaper .brand,
+body.dim.wallpaper-full .brand { color: #fff; text-shadow: 0 1px 4px rgba(0,0,0,.55); }
+body.dim.has-wallpaper .brand-sub,
+body.dim.wallpaper-full .brand-sub { color: rgba(255,255,255,.85); text-shadow: 0 1px 4px rgba(0,0,0,.55); }
+body.dim.has-wallpaper .brand .dot,
+body.dim.wallpaper-full .brand .dot { box-shadow: 0 1px 4px rgba(0,0,0,.5); }
 
 button { font-family: inherit; cursor: pointer; }
 
@@ -54,23 +63,12 @@ button { font-family: inherit; cursor: pointer; }
   position: sticky;
   top: 0;
   z-index: 20;
-  background: rgba(245, 246, 248, 0.92);
-  backdrop-filter: saturate(180%) blur(8px);
-  border-bottom: 1rpx solid var(--line);
-}
-/* 顶部玻璃蒙版：内容向上滑入时在此处被柔化遮挡，避免与导航文字硬重叠（红框需求） */
-.header::after {
-  content: '';
-  position: absolute;
-  left: 0; right: 0; bottom: -22px; height: 22px;
-  pointer-events: none;
-  background: linear-gradient(to bottom, rgba(245,246,248,.95), rgba(245,246,248,0));
-  backdrop-filter: blur(6px) saturate(160%);
-  -webkit-backdrop-filter: blur(6px) saturate(160%);
-}
-body.dim .header::after,
-body.wallpaper-full .header::after {
-  background: linear-gradient(to bottom, rgba(16,18,24,.72), rgba(16,18,24,0));
+  background: rgba(245, 246, 248, 0.7);
+  backdrop-filter: saturate(180%) blur(10px);
+  -webkit-backdrop-filter: saturate(180%) blur(10px);
+  border-bottom: none;
+  /* 柔化、虚化的分隔：向下渐隐的极淡阴影，无硬边线，让上下更融合 */
+  box-shadow: 0 2px 12px -6px rgba(15, 18, 24, 0.12);
 }
 .header-inner {
   max-width: var(--maxw);
@@ -646,13 +644,15 @@ body.dim.has-wallpaper .wallpaper::after {
   background: rgba(13, 15, 21, var(--dim-scrim, .72));
   pointer-events: none;
 }
-/* 顶部标题栏在暗调下不做实块，露出被压暗的壁纸，更通透（仅下方三个切换按钮转暗玻璃/亮绿） */
+/* 暗调顶栏：深色磨砂玻璃，与主题一致（浅色=浅玻璃 / 暗色=深玻璃，不再反转） */
 body.dim .header {
-  background: transparent;
+  background: rgba(18, 20, 26, 0.62);
   color: var(--text);
-  border-bottom-color: rgba(255, 255, 255, .06);
+  backdrop-filter: saturate(180%) blur(10px);
+  -webkit-backdrop-filter: saturate(180%) blur(10px);
+  /* 暗调同样用柔和虚化阴影，与浅色对称，无硬线 */
+  box-shadow: 0 2px 12px -6px rgba(0, 0, 0, 0.45);
 }
-body.dim.has-wallpaper .header { background: transparent; }
 /* 品牌标题 / 副标题提亮 */
 body.dim .brand { color: #f4f6f9; }
 body.dim .brand .dot { box-shadow: 0 0 0 3px rgba(var(--green-rgb, 7, 193, 96), .25); }

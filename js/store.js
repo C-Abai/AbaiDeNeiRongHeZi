@@ -310,6 +310,14 @@
     set('--card', card);
     set('--text', text);
 
+    // 同步浏览器/系统状态栏颜色（theme-color）：浅色用浅色、暗色用深色，避免主题切换时顶栏颜色反转
+    let _tc = document.querySelector('meta[name="theme-color"]');
+    if (!_tc) { _tc = document.createElement('meta'); _tc.name = 'theme-color'; document.head.appendChild(_tc); }
+    _tc.setAttribute('content', bg);
+    // iOS 状态栏样式跟随主题：浅色 default（黑字浅底），暗色 black-translucent（与深色融合）
+    const _sb = document.querySelector('meta[name="apple-mobile-web-app-status-bar-style"]');
+    if (_sb) _sb.setAttribute('content', dim ? 'black-translucent' : 'default');
+
     // 透明度：内容气泡（卡片）与顶栏，均为 0~100 的百分比
     // 暗调模式下 --card-bg 已在上方 dim 分支设为可调节的暗色玻璃，此处不再覆盖
     if (!dim) {

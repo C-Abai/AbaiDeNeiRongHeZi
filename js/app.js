@@ -353,7 +353,9 @@
   function renderList(main, category, title, extraHtml) {
     const all = CBStore.publicPosts(content, category).concat(localPostsAll());
     const kw = (searchState[category] || '').trim().toLowerCase();
-    let html = '<div class="post-search"><input id="postSearch" class="post-search-input" type="search" enterkeyhint="search" placeholder="搜索主题、标题或内容…" value="' + esc(searchState[category] || '') + '"/></div>'
+    let html = (category === 'article'
+      ? '<div class="post-search"><input id="postSearch" class="post-search-input" type="search" enterkeyhint="search" placeholder="搜索主题、标题或内容…" value="' + esc(searchState[category] || '') + '"/></div>'
+      : '')
       + '<div id="postListWrap">' + listInnerHtml(category, all, title) + '</div>';
     // 非文章分类（黑科技）在无搜索词时追加工具/链接区；有搜索词则只显示匹配文章
     if (extraHtml && !kw) html += extraHtml;
