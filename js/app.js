@@ -834,9 +834,10 @@
     const body = $('#ovBody');
     const land = p.coverShape === 'landscape' ? ' land' : '';
     if (p.displayMode === 'chat') {
-      const segs = (Array.isArray(p.chatSegments) && p.chatSegments.length)
-        ? p.chatSegments
+      let segs = (Array.isArray(p.chatSegments) && p.chatSegments.length)
+        ? p.chatSegments.slice()
         : segmentToBubbles(p.content || '');
+      if (p.chatBubbleOrder === 'reverse') segs = segs.slice().reverse();
       const avatar = (p.cover)
         ? '<img class="chat-av" src="' + esc(p.cover) + '" alt=""/>'
         : (content.config && content.config.icon)

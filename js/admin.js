@@ -300,23 +300,38 @@
     // ===== 聊天界面模式：显示模式 + 气泡编辑 =====
     let displayMode = d.displayMode === 'chat' ? 'chat' : 'normal';
     let chatSegData = Array.isArray(d.chatSegments) ? d.chatSegments.slice() : [];
+    let chatBubbleOrder = d.chatBubbleOrder === 'reverse' ? 'reverse' : 'normal';
 
-    // 聊天气泡编辑区：逐条编辑 / 从正文生成 / 手动添加
+    // 聊天气泡编辑区：排序切换 / 逐条编辑 / 顶部·底部添加 / 从正文生成
     function renderChatSeg() {
       const wrap = $('#chatSegWrap');
       if (!wrap) return;
+      const orderSeg = '<div class="seg" id="f_border" style="margin-bottom:10px">'
+        + '<button type="button" data-v="normal"' + (chatBubbleOrder === 'normal' ? ' class="active"' : '') + '>↓ 从上往下</button>'
+        + '<button type="button" data-v="reverse"' + (chatBubbleOrder === 'reverse' ? ' class="active"' : '') + '>↑ 从下往上</button></div>';
+      let html = orderSeg;
       if (!chatSegData.length) {
-        wrap.innerHTML = '<p class="help">暂无气泡。点击下方「从正文生成气泡」自动分段，或「＋ 添加气泡」手动添加。</p>';
+        html += '<p class="help">暂无气泡。点击下方「从正文生成气泡」自动分段，或「顶部加 / 底部加」手动添加。</p>';
       } else {
-        wrap.innerHTML = '<div class="chat-seg-list">' + chatSegData.map(function (s, i) {
+        html += '<div class="chat-seg-list">' + chatSegData.map(function (s, i) {
           return '<div class="chat-seg-item"><div class="chat-seg-idx">气泡 ' + (i + 1) + '</div>'
             + '<textarea class="chat-seg-ta" data-i="' + i + '">' + esc(s) + '</textarea>'
             + '<button type="button" class="btn danger chat-seg-del" data-i="' + i + '">删除</button></div>';
         }).join('') + '</div>';
       }
-      wrap.insertAdjacentHTML('beforeend',
-        '<div class="row" style="margin-top:8px"><button type="button" class="btn ghost" id="segAuto">从正文生成气泡</button>'
-        + '<button type="button" class="btn ghost" id="segAdd">＋ 添加气泡</button></div>');
+      html += '<div class="row" style="margin-top:8px">'
+        + '<button type="button" class="btn ghost" id="segTop">↑ 顶部加气泡</button>'
+        + '<button type="button" class="btn ghost" id="segAdd">↓ 底部加气泡</button>'
+        + '<button type="button" class="btn ghost" id="segAuto">从正文生成气泡</button></div>';
+      wrap.innerHTML = html;
+      const ob = $('#f_border');
+      if (ob) ob.querySelectorAll('button').forEach(function (b) {
+        b.addEventListener('click', function () {
+          chatBubbleOrder = b.dataset.v;
+          ob.querySelectorAll('button').forEach(function (x) { x.classList.remove('active'); });
+          b.classList.add('active');
+        });
+      });
       wrap.querySelectorAll('.chat-seg-ta').forEach(function (ta) {
         ta.addEventListener('input', function () { chatSegData[+ta.dataset.i] = ta.value; });
       });
@@ -328,6 +343,7 @@
         if (!chatSegData.length) { toast('正文为空，无法生成'); return; }
         renderChatSeg(); toast('已从正文生成 ' + chatSegData.length + ' 条气泡');
       };
+      const addTop = $('#segTop'); if (addTop) addTop.onclick = function () { chatSegData.unshift(''); renderChatSeg(); };
       const add = $('#segAdd'); if (add) add.onclick = function () { chatSegData.push(''); renderChatSeg(); };
     }
 
@@ -372,6 +388,7 @@
         content: $('#f_content').value,
         displayMode: displayMode,
         chatSegments: chatSegData,
+        chatBubbleOrder: chatBubbleOrder,
         cover: coverData,
         coverShape: shapeData,
         pinned: $('#f_pinned').checked,
