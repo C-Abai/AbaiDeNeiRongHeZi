@@ -2,14 +2,14 @@
 
 > 用途：当你换电脑、在新设备上登录 WorkBuddy（本平台）时，历史聊天记录不在。
 > 只要让助手「读取 GitHub 仓库里的 HANDOVER.md（本文件）」并把后台密钥告诉我，
-> 助手立刻恢复到当前（v63）的全部上下文，继续帮你改内容 / 优化 / 部署。
+> 助手立刻恢复到当前（v68）的全部上下文，继续帮你改内容 / 优化 / 部署。
 > 本文档由助手在 v62 发布后整理，是「自包含」的，不依赖任何历史对话。
 
 ---
 
 ## 0. 这是什么 / 关键标识（必存）
 
-「内容盒子」是一个**静态 PWA（渐进式 Web 应用）**，用来展示文章 / 帖子 / 黑科技工具等内容。当前线上版本 **v63**。
+「内容盒子」是一个**静态 PWA（渐进式 Web 应用）**，用来展示文章 / 帖子 / 黑科技工具等内容。当前线上版本 **v68**。
 
 | 项目 | 值 |
 |---|---|
@@ -17,6 +17,8 @@
 | 后台（管理 / 编辑） | `https://content-box-24323.app.workbuddy.host/admin.html?key=nebadmin2026` |
 | 部署 appId（同链接重部署用） | `wbapp_jFiM5Y7b9RmUulYAimy36N` |
 | GitHub 仓库 | `https://github.com/C-Abai/AbaiDeNeiRongHeZi`（Public，main 分支） |
+| APK 直链（下载安装包，必带 sharecode） | `https://content-box-24323.app.workbuddy.host/app.apk?sharecode=AK6QIELR67` |
+| APK 短链（跳转同上，发人更短） | `https://tinyurl.com/2czwkvaw` |
 
 ---
 
@@ -39,7 +41,7 @@
 仓库 `C-Abai/AbaiDeNeiRongHeZi` 同时是：
 
 1. **内容源**：`content.json` / `meta.json`（线上实时拉取）
-2. **完整代码源**：含全部 19 个文件（含 v62 代码）。换设备 `clone` 即可拿到完整工程。
+2. **完整代码源**：含全部文件（含 v68 代码）。换设备 `clone` 即可拿到完整工程。
 
 仓库根目录文件清单：
 `index.html` / `preview.html` / `admin.html` / `download.html` / `watch.html` /
@@ -101,11 +103,21 @@
   只要显式传 appId，哪怕从任意新目录 / 新设备部署，都会**覆盖原链接 `…24323`，绝不生成新链接**（本助手已实测验证）。
 - ⚠️ **改 CSS/JS 后必须升 Service Worker 版本号**：改 `sw.js` 里的 `CACHE = 'contentbox-vXX'` 与 `meta.json` 的 `sw` 字段到新版本，
   否则老用户浏览器缓存名不变，会继续加载旧界面、看不到新优化。
-- 发布后提醒用户**杀 PWA 后台重进**，让新的 Service Worker（当前 v63）接管缓存。
+- 发布后提醒用户**杀 PWA 后台重进**，让新的 Service Worker（当前 v68）接管缓存。
 
 ---
 
-## 6. 当前版本状态（v63）已实现的功能
+## 5b. APK 安装包直链与下载（必读坑）
+
+- **直链必须带 `?sharecode=AK6QIELR67`**：实测不带 sharecode（或只留 `?`、或空参数）服务器直接返回 `403 Forbidden`，下不到包。`sharecode` 是下载 APK 的访问钥匙，不是可省略的追踪参数。故 `content.json` / `download.html` / 后台「APK 直装链接」里的 `apkUrl` **必须保留完整 sharecode**。
+- **短链（发人更短，不影响任何同步）**：`https://tinyurl.com/2czwkvaw` —— 仅做 301 跳转到上面的完整直链，最终下到的还是同一份 APK（已验证 `200` + 8.7MB）。它**不影响**原直链、已装 APK 的内容同步（APK 同步靠拉 PWA 的 `content.json`，与下载链接无关）、网页同步。短链依赖第三方 TinyURL，长期分发请以原直链兜底。
+- **微信/QQ 内仍可能拦截**：直链与短链在微信里都可能被拦（之前直链就被提示「停止访问」），微信场景改用「二维码跳网页」最稳。
+- **换设备重部署覆盖原链接**：见 §5「跨设备部署铁律」——复用 `appId = wbapp_jFiM5Y7b9RmUulYAimy36N` 即覆盖 `…24323`，不生成新链接（已实测）。
+- **小米应用商店误报（当前状态 v68）**：v68 已在 APK 内（WebView，`; wv)` UA）隐藏「下载 APK」按钮；但 `content.json` 的 `apkUrl`、`download.html` 自动下载页、`admin.js` 里的硬编码直链仍含 `.apk` 字面量。若小米仍报「APK 内诱导下载」，系扫描器静态/全站匹配「.apk 下载能力」所致。若要彻底过：把 `apkUrl` 移出 `content.json`、删除 `download.html`、清理 `admin.js` 硬编码（纯前端改造，无需动 ToAPP 后台、无需换直链）。当前用户选择暂不改动。
+
+---
+
+## 6. 当前版本状态（v68）已实现的功能
 
 - 顶部导航栏上移，减小上方空白（保留手机通知栏安全区）。
 - 顶部玻璃蒙版层（`backdrop-filter` 模糊），内容向上滑入时不再穿透到导航按钮 / 文字。
@@ -113,7 +125,7 @@
 - 帖子卡片压缩 + 「📌 置顶内容」折叠卡（默认展开，点标题栏可折叠）。
 - 顶部导航栏改为跟随主题的磨砂玻璃 + 柔和虚化阴影，修复深浅主题颜色反转；黑科技分类取消搜索框（v63 新增）。
 - 以上全部适配**浅色 / 暗调主题**，前端 / 预览端 / 后台三端共用同一份 `css/style.css` 与 `js/app.js`。
-- Service Worker 缓存版本：`contentbox-v63`（每次改 CSS/JS 必须升版本号，否则老用户读旧缓存）。
+- Service Worker 缓存版本：`contentbox-v68`（每次改 CSS/JS 必须升版本号，否则老用户读旧缓存）。
 
 ---
 
@@ -136,4 +148,4 @@
 
 ---
 
-*本手册由助手在 v62 发布后整理，作为跨设备恢复上下文使用。*
+*本手册由助手在 v68 发布后整理并更新，作为跨设备恢复上下文使用。*
