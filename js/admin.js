@@ -104,6 +104,23 @@
       return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c];
     });
   }
+  // 与公开端一致：将正文自动分段为气泡数组（聊天界面模式）
+  function segmentToBubbles(text) {
+    text = String(text == null ? '' : text);
+    if (!text.trim()) return [];
+    const out = [];
+    const paras = text.split(/\n\s*\n/).map(function (s) { return s.trim(); }).filter(Boolean);
+    (paras.length ? paras : [text.trim()]).forEach(function (para) {
+      let buf = '';
+      for (let i = 0; i < para.length; i++) {
+        const ch = para[i];
+        buf += ch;
+        if ('。！？!?；;…'.indexOf(ch) >= 0) { out.push(buf.trim()); buf = ''; }
+      }
+      if (buf.trim()) out.push(buf.trim());
+    });
+    return out.length ? out : [text.trim()];
+  }
 
   // 后台自身暗调开关：本机记忆；开启后后台界面套用后台调好的暗调参数（与公开端暗调一致）
   function getAdminDim() { try { return localStorage.getItem('cb_admin_dim') === '1'; } catch (e) { return false; } }
@@ -252,6 +269,11 @@
       + '<div class="field"><label>分类</label><select id="f_cat"><option value="article"' + (d.category === 'article' ? ' selected' : '') + '>文章</option><option value="tech"' + (d.category === 'tech' ? ' selected' : '') + '>黑科技</option></select></div>'
       + '<div class="field"><label>摘要</label><input type="text" id="f_sum" value="' + esc(d.summary) + '"/></div>'
       + '<div class="field"><label>正文（支持换行）</label><textarea id="f_content">' + esc(d.content) + '</textarea></div>'
+      + '<div class="field"><label>显示模式</label><div class="seg" id="f_dmode">'
+      + '<button type="button" data-v="normal"' + (d.displayMode !== 'chat' ? ' class="active"' : '') + '>📄 普通</button>'
+      + '<button type="button" data-v="chat"' + (d.displayMode === 'chat' ? ' class="active"' : '') + '>💬 聊天界面</button></div>'
+      + '<p class="help" id="dmodeHelp">' + (d.displayMode === 'chat' ? '聊天界面：下方为逐条气泡内容，可直接编辑；留空气泡可在保存前删除。' : '聊天界面模式会把正文自动切分成气泡、以聊天形式展示；切换后下方出现气泡编辑区。') + '</p></div>'
+      + '<div id="chatSegWrap" style="' + (d.displayMode === 'chat' ? '' : 'display:none') + '"></div>'
       + '<div class="field"><label>封面图</label><input type="file" id="f_cover" accept="image/*"/><img class="cover-preview" id="f_cover_prev" src="' + (d.cover || '') + '" style="' + (d.cover ? '' : 'display:none') + '"/></div>'
       + '<div class="field"><label>封面展示方式</label><div class="seg" id="f_shape">'
       + '<button type="button" data-v="square"' + (d.coverShape !== 'landscape' ? ' class="active"' : '') + '>⬜ 正方形</button>'
@@ -274,6 +296,63 @@
         });
       });
     }
+
+    // ===== 聊天界面模式：显示模式 + 气泡编辑 =====
+    let displayMode = d.displayMode === 'chat' ? 'chat' : 'normal';
+    let chatSegData = Array.isArray(d.chatSegments) ? d.chatSegments.slice() : [];
+
+    // 聊天气泡编辑区：逐条编辑 / 从正文生成 / 手动添加
+    function renderChatSeg() {
+      const wrap = $('#chatSegWrap');
+      if (!wrap) return;
+      if (!chatSegData.length) {
+        wrap.innerHTML = '<p class="help">暂无气泡。点击下方「从正文生成气泡」自动分段，或「＋ 添加气泡」手动添加。</p>';
+      } else {
+        wrap.innerHTML = '<div class="chat-seg-list">' + chatSegData.map(function (s, i) {
+          return '<div class="chat-seg-item"><div class="chat-seg-idx">气泡 ' + (i + 1) + '</div>'
+            + '<textarea class="chat-seg-ta" data-i="' + i + '">' + esc(s) + '</textarea>'
+            + '<button type="button" class="btn danger chat-seg-del" data-i="' + i + '">删除</button></div>';
+        }).join('') + '</div>';
+      }
+      wrap.insertAdjacentHTML('beforeend',
+        '<div class="row" style="margin-top:8px"><button type="button" class="btn ghost" id="segAuto">从正文生成气泡</button>'
+        + '<button type="button" class="btn ghost" id="segAdd">＋ 添加气泡</button></div>');
+      wrap.querySelectorAll('.chat-seg-ta').forEach(function (ta) {
+        ta.addEventListener('input', function () { chatSegData[+ta.dataset.i] = ta.value; });
+      });
+      wrap.querySelectorAll('.chat-seg-del').forEach(function (b) {
+        b.addEventListener('click', function () { chatSegData.splice(+b.dataset.i, 1); renderChatSeg(); });
+      });
+      const a = $('#segAuto'); if (a) a.onclick = function () {
+        chatSegData = segmentToBubbles($('#f_content').value);
+        if (!chatSegData.length) { toast('正文为空，无法生成'); return; }
+        renderChatSeg(); toast('已从正文生成 ' + chatSegData.length + ' 条气泡');
+      };
+      const add = $('#segAdd'); if (add) add.onclick = function () { chatSegData.push(''); renderChatSeg(); };
+    }
+
+    const dmodeSeg = $('#f_dmode');
+    if (dmodeSeg) {
+      dmodeSeg.querySelectorAll('button').forEach(function (b) {
+        b.addEventListener('click', function () {
+          displayMode = b.dataset.v;
+          dmodeSeg.querySelectorAll('button').forEach(function (x) { x.classList.remove('active'); });
+          b.classList.add('active');
+          const wrap = $('#chatSegWrap');
+          const help = $('#dmodeHelp');
+          if (displayMode === 'chat') {
+            wrap.style.display = '';
+            if (!chatSegData.length) chatSegData = segmentToBubbles($('#f_content').value);
+            renderChatSeg();
+            if (help) help.textContent = '聊天界面：下方为逐条气泡内容，可直接编辑；留空气泡可在保存前删除。';
+          } else {
+            wrap.style.display = 'none';
+            if (help) help.textContent = '聊天界面模式会把正文自动切分成气泡、以聊天形式展示；切换后下方出现气泡编辑区。';
+          }
+        });
+      });
+    }
+    if (displayMode === 'chat') renderChatSeg();
     $('#f_cover').onchange = async function (e) {
       const file = e.target.files[0];
       if (!file) return;
@@ -291,6 +370,8 @@
         category: $('#f_cat').value,
         summary: $('#f_sum').value.trim(),
         content: $('#f_content').value,
+        displayMode: displayMode,
+        chatSegments: chatSegData,
         cover: coverData,
         coverShape: shapeData,
         pinned: $('#f_pinned').checked,

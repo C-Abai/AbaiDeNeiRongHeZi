@@ -275,6 +275,24 @@
     const hay = [p.title, p.summary, p.content, p.category, (p.tags || []).join(' ')].join(' ').toLowerCase();
     return hay.indexOf(kw) !== -1;
   }
+  // 将一大段正文自动分段为气泡数组（用于文章「聊天界面模式」）：
+  // 先按空行/换行切成段落，再对长段落按句末标点切句，避免单气泡过长。
+  function segmentToBubbles(text) {
+    text = String(text == null ? '' : text);
+    if (!text.trim()) return [];
+    const out = [];
+    const paras = text.split(/\n\s*\n/).map(function (s) { return s.trim(); }).filter(Boolean);
+    (paras.length ? paras : [text.trim()]).forEach(function (para) {
+      let buf = '';
+      for (let i = 0; i < para.length; i++) {
+        const ch = para[i];
+        buf += ch;
+        if ('。！？!?；;…'.indexOf(ch) >= 0) { out.push(buf.trim()); buf = ''; }
+      }
+      if (buf.trim()) out.push(buf.trim());
+    });
+    return out.length ? out : [text.trim()];
+  }
   // 生成一组帖子卡片（压缩尺寸由 CSS 控制）
   function cardsHtml(list, category) {
     return list.map(function (p) {
@@ -364,6 +382,7 @@
     bindSearch(main, category);
     bindCards(main);
     bindPinnedToggle(main, category);
+    bindLocalPostComposer();   // 修复：该函数此前已定义却未调用，导致文章列表底部「＋ 本地」点不开
   }
 
   // 隐蔽的本地发帖表单（与后台发帖字段一致：标题/分类/摘要/正文/封面/置顶）
@@ -814,10 +833,32 @@
     if (cardEl) { const f = cardEl.querySelector('.post-new-flag'); if (f) f.remove(); }
     const body = $('#ovBody');
     const land = p.coverShape === 'landscape' ? ' land' : '';
-    body.innerHTML = (p.cover ? '<img class="article-cover' + land + '" src="' + p.cover + '"/>' : '')
-      + '<h1 class="article-h1">' + esc(p.title) + '</h1>'
-      + '<div class="article-meta">' + (p.category === 'tech' ? '黑科技' : '文章') + ' · ' + fmtDate(p.updatedAt) + '</div>'
-      + '<div class="article-content">' + esc(p.content || '') + '</div>';
+    if (p.displayMode === 'chat') {
+      const segs = (Array.isArray(p.chatSegments) && p.chatSegments.length)
+        ? p.chatSegments
+        : segmentToBubbles(p.content || '');
+      const avatar = (content.config && content.config.icon)
+        ? '<img class="chat-av" src="' + esc(content.config.icon) + '" alt=""/>'
+        : '<div class="chat-av chat-av-def">🤖</div>';
+      const bubbles = segs.map(function (s) {
+        return '<div class="chat-row"><div class="chat-av-wrap">' + avatar + '</div>'
+          + '<div class="chat-bubble">' + esc(s) + '</div></div>';
+      }).join('');
+      body.innerHTML = '<div class="chat-view">'
+        + '<div class="chat-head">'
+        + '<div class="chat-head-title">' + esc(p.title) + '</div>'
+        + (p.summary ? '<div class="chat-head-key">🔑 ' + esc(p.summary) + '</div>' : '')
+        + '<div class="chat-head-meta">' + (p.category === 'tech' ? '黑科技' : '文章') + ' · ' + fmtDate(p.updatedAt) + '</div>'
+        + '</div>'
+        + (p.cover ? '<img class="article-cover' + land + '" src="' + p.cover + '"/>' : '')
+        + '<div class="chat-bubbles">' + bubbles + '</div>'
+        + '</div>';
+    } else {
+      body.innerHTML = (p.cover ? '<img class="article-cover' + land + '" src="' + p.cover + '"/>' : '')
+        + '<h1 class="article-h1">' + esc(p.title) + '</h1>'
+        + '<div class="article-meta">' + (p.category === 'tech' ? '黑科技' : '文章') + ' · ' + fmtDate(p.updatedAt) + '</div>'
+        + '<div class="article-content">' + esc(p.content || '') + '</div>';
+    }
     $('#overlay').classList.add('show');
     body.scrollTop = 0;
     // 压入一条历史：让手机/全屏模式按返回键时只关闭浮层，而不是退出 App
