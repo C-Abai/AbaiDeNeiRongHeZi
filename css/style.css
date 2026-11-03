@@ -594,6 +594,11 @@ body.dim #versionToast { background: rgba(20,23,30,.95); }
 .install-name { font-size: 16px; font-weight: 700; color: var(--text); }
 .install-sub { font-size: 13px; color: var(--muted); line-height: 1.6; margin-top: 3px; }
 .install-actions { display: flex; flex-direction: column; gap: 10px; }
+.inapp-tip {
+  padding: 13px; text-align: center; font-size: 14px; font-weight: 600;
+  color: var(--brand, #2e7d32); background: var(--brand-soft, #eaf6ec);
+  border: 1px solid var(--brand-line, #cfe9d3); border-radius: 10px;
+}
 .install-app-btn {
   width: 100%; font-size: 15px; padding: 13px; font-weight: 600;
 }

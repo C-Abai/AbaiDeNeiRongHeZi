@@ -748,67 +748,78 @@
     const apkUrl = (content.config && content.config.apkUrl) || '';
     const isWx = /micromessenger/i.test(navigator.userAgent);   // 微信内置浏览器无法直下 apk
     const isIOS = !isWx && /iphone|ipad|ipod/i.test(navigator.userAgent);  // iOS 不支持直下 apk，需「添加到主屏幕」
+    // 是否运行在原生 App 内嵌的 WebView 中（如 ToAPP 打包的 APK、微信/QQ 内置浏览器等）。
+    // 依据：标准 Android WebView 的 UA 必含 "; wv)" 标记，而普通手机浏览器（Chrome/Safari）无此标记。
+    // 在 WebView 内隐藏「下载 APK」入口，消除「APK 内诱导下载 APK」的闭环，降低应用商店安全扫描误报。
+    const isWebView = /;\s*wv\)/.test(navigator.userAgent);
     const installText = (content.config && content.config.installText)
       ? escNl(content.config.installText)
       : '手机浏览器打开本页，点上方按钮即可安装到主屏；若已配置 APK 链接，可直接下载安装包，离线也能用。';
-    const subText = isIOS
-      ? '苹果设备无需下载安装包，用 Safari 打开本页后「添加到主屏幕」，即可像 App 一样使用。'
-      : installText;
+    const subText = isWebView
+      ? '你正在 App 内使用本应用，内容已自动同步，无需再次安装。'
+      : (isIOS
+        ? '苹果设备无需下载安装包，用 Safari 打开本页后「添加到主屏幕」，即可像 App 一样使用。'
+        : installText);
     const wxTip = isWx
       ? '<div class="wx-tip">⚠️ 微信内不支持直接下载安装包，请点击右上角 <b>···</b> → <b>在浏览器中打开</b>，再点「一键安装」即可下载。</div>'
       : '';
     const iosTip = isIOS
       ? '<div class="ios-tip">🍎 苹果设备暂不支持下载安装包。请用 <b>Safari</b> 打开本页 → 点底部「分享」图标 → <b>添加到主屏幕</b>，即可像 App 一样使用。</div>'
       : '';
+    // WebView 内不渲染「下载 APK」按钮与二维码（避免被应用商店判定为 APK 内诱导下载），改为提示已安装
+    const installActions = isWebView
+      ? '<div class="install-actions"><div class="inapp-tip">✅ 你已在 App 内打开，无需重复安装</div></div>'
+      : '<div class="install-actions"><button class="btn install-app-btn" id="installAppBtn">📲 一键安装</button></div>'
+        + '<div class="qr-wrap"><div class="qr" id="aboutQr"></div>'
+        + '<p class="card-desc" style="text-align:center;font-size:12px;margin:8px 0 0">手机扫码在浏览器打开下载页</p></div>';
     let installHtml = '<div class="section-title">📲 安装 APP</div>'
       + '<div class="install-mini' + (isWx ? ' wx' : (isIOS ? ' ios' : '')) + '">'
       + '<div class="install-top"><div class="install-icon">📱</div>'
       + '<div class="install-head"><div class="install-name">安装到手机</div>'
       + '<div class="install-sub">' + subText + '</div></div></div>'
       + wxTip + iosTip
-      + '<div class="install-actions">'
-      + '<button class="btn install-app-btn" id="installAppBtn">📲 一键安装</button>'
-      + '</div>'
-      + '<div class="qr-wrap"><div class="qr" id="aboutQr"></div>'
-      + '<p class="card-desc" style="text-align:center;font-size:12px;margin:8px 0 0">手机扫码在浏览器打开下载页</p></div>'
+      + installActions
       + '</div>';
     main.insertAdjacentHTML('beforeend', installHtml);
 
     // 关于页底部：显示与部署 SW 同步的版本号（V + 数字，无多余文字）
     main.insertAdjacentHTML('beforeend', '<div class="app-version" id="appVersion">V…</div>');
+
     resolveAppVersion().then(function (v) {
       const el = $('#appVersion');
       if (el) el.textContent = 'V' + (swVersionNum(v) || '?');
     });
 
-    $('#installAppBtn').addEventListener('click', function () {
-      if (window.__installPrompt) { installNow(); return; }
-      if (isWx) { toast('请点右上角 ··· 在浏览器中打开本页后再下载'); return; }
-      if (isIOS) { toast('请用 Safari 打开本页，点底部「分享」→ 添加到主屏幕'); return; }
-      if (apkUrl) { location.href = apkUrl; return; }
-      toast('请用浏览器菜单「安装 / 添加到主屏幕」');
-    });
-    // 二维码编码「下载引导页」：普通网页链接，不会被微信/QQ 等扫码工具拦截（之前直接用 .apk 直链会提示「停止访问」）
-    // qrcode.js 已从首屏剥离，这里按需异步加载后再渲染（仅访问关于页时才拉取，不拖累首屏）
-    const aboutQrUrl = location.origin + '/?sharecode=AK6QIELR67&to=install';
-    ensureQrcode().then(function () {
+    if (!isWebView) {
+      $('#installAppBtn').addEventListener('click', function () {
+        if (window.__installPrompt) { installNow(); return; }
+        if (isWx) { toast('请点右上角 ··· 在浏览器中打开本页后再下载'); return; }
+        if (isIOS) { toast('请用 Safari 打开本页，点底部「分享」→ 添加到主屏幕'); return; }
+        if (apkUrl) { location.href = apkUrl; return; }
+        toast('请用浏览器菜单「安装 / 添加到主屏幕」');
+      });
+      // 二维码编码「下载引导页」：普通网页链接，不会被微信/QQ 等扫码工具拦截（之前直接用 .apk 直链会提示「停止访问」）
+      // qrcode.js 已从首屏剥离，这里按需异步加载后再渲染（仅访问关于页时才拉取，不拖累首屏）
+      const aboutQrUrl = location.origin + '/?sharecode=AK6QIELR67&to=install';
+      ensureQrcode().then(function () {
+        try {
+          const qr = qrcode(0, 'M');
+          qr.addData(aboutQrUrl);
+          qr.make();
+          const qe = $('#aboutQr');
+          if (qe) qe.innerHTML = '<img src="' + qr.createDataURL(5, 2) + '" alt="qr"/>';
+        } catch (e) {}
+      }).catch(function () {});
+      // 扫码引导进入时，聚焦安装区并轻微高亮，方便用户立即下载
       try {
-        const qr = qrcode(0, 'M');
-        qr.addData(aboutQrUrl);
-        qr.make();
-        const qe = $('#aboutQr');
-        if (qe) qe.innerHTML = '<img src="' + qr.createDataURL(5, 2) + '" alt="qr"/>';
+        if (new URLSearchParams(location.search).get('to') === 'install') {
+          setTimeout(function () {
+            const b = $('#installAppBtn');
+            if (b) { b.scrollIntoView({ behavior: 'smooth', block: 'center' }); b.classList.add('focus-pulse'); }
+          }, 350);
+        }
       } catch (e) {}
-    }).catch(function () {});
-    // 扫码引导进入时，聚焦安装区并轻微高亮，方便用户立即下载
-    try {
-      if (new URLSearchParams(location.search).get('to') === 'install') {
-        setTimeout(function () {
-          const b = $('#installAppBtn');
-          if (b) { b.scrollIntoView({ behavior: 'smooth', block: 'center' }); b.classList.add('focus-pulse'); }
-        }, 350);
-      }
-    } catch (e) {}
+    }
 
     // 公开端外观主题开关：浅色 / 暗调 切换（暗调套用后台参数），选择记住在本机
     const tgl = $('#themeToggle');
