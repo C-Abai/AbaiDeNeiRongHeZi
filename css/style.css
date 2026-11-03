@@ -997,7 +997,15 @@ body.dim .chat-head {
   border-color: rgba(255,90,90,.5);
   background: linear-gradient(180deg, rgba(255,90,90,.16), rgba(255,90,90,.06));
 }
-body.dim .chat-bubble { border-color: rgba(255,255,255,.1); box-shadow: none; }
+body.dim .chat-head-title { color: #f4f6f9; }
+body.dim .chat-head-key { color: #d6dae2; opacity: 1; }
+body.dim .chat-head-meta { color: #9aa1ac; }
+body.dim .chat-bubble { background: #1a1d25; color: #eef1f5; border-color: rgba(255,255,255,.1); box-shadow: none; }
+/* 后台暗调预览同样适配（避免变量未覆盖导致深色叠深色） */
+body.admin-dark .chat-head-title { color: #f4f6f9; }
+body.admin-dark .chat-head-key { color: #d6dae2; opacity: 1; }
+body.admin-dark .chat-head-meta { color: #9aa1ac; }
+body.admin-dark .chat-bubble { background: #1a1d25; color: #eef1f5; border-color: rgba(255,255,255,.1); box-shadow: none; }
 body.has-wallpaper .chat-head,
 body.wallpaper-full .chat-head { backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
 body.has-wallpaper .chat-bubble,

@@ -837,9 +837,11 @@
       const segs = (Array.isArray(p.chatSegments) && p.chatSegments.length)
         ? p.chatSegments
         : segmentToBubbles(p.content || '');
-      const avatar = (content.config && content.config.icon)
-        ? '<img class="chat-av" src="' + esc(content.config.icon) + '" alt=""/>'
-        : '<div class="chat-av chat-av-def">🤖</div>';
+      const avatar = (p.cover)
+        ? '<img class="chat-av" src="' + esc(p.cover) + '" alt=""/>'
+        : (content.config && content.config.icon)
+          ? '<img class="chat-av" src="' + esc(content.config.icon) + '" alt=""/>'
+          : '<div class="chat-av chat-av-def">🤖</div>';
       const bubbles = segs.map(function (s) {
         return '<div class="chat-row"><div class="chat-av-wrap">' + avatar + '</div>'
           + '<div class="chat-bubble">' + esc(s) + '</div></div>';
@@ -850,7 +852,6 @@
         + (p.summary ? '<div class="chat-head-key">🔑 ' + esc(p.summary) + '</div>' : '')
         + '<div class="chat-head-meta">' + (p.category === 'tech' ? '黑科技' : '文章') + ' · ' + fmtDate(p.updatedAt) + '</div>'
         + '</div>'
-        + (p.cover ? '<img class="article-cover' + land + '" src="' + p.cover + '"/>' : '')
         + '<div class="chat-bubbles">' + bubbles + '</div>'
         + '</div>';
     } else {
