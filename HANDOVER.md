@@ -313,4 +313,21 @@ git diff --stat HEAD origin/main                   # 其他文件差异摘要
 - **线上验证**：sw=v78、app.js `&v=78`、app.js 中 `apkUrl` 判断位于 PWA 安装提示之前且 WebView 隐藏逻辑原样、admin.js 含 `fetchWithTimeout/正在载入/saveLocalOnly(content)/DEFAULT_INSTALL_URL/draftStale`、托管与 GitHub 的 meta.json 均为新指纹、`content.json` 的 `apkUrl` 指向引导页且 guide 已启用。提交 `943eabd` 已推 GitHub 并重新部署。
 - **注意**：改 `contentHash` 会让所有设备下次打开重新下载 1.28MB content.json（预期行为，用于清掉旧缓存）。后台仍建议 `Ctrl+Shift+R` 强刷一次加载 v78 的 admin.js。
 
+## 2026-11-04 补充：根治加载延迟 / v66 旧内容残留 / 引导页独立化（v79）
+
+- **用户报的三个症状**：① 后台输密码后仍要等很久；② 网页端用网址进去是 **v66 老内容**，要刷新好多遍才变最新；③ 一键安装确实跳引导页了，但「是可以开启内容的界面」（跳过去后仍留在内容页历史栈 / 被主应用界面包裹）。用户强调**特别是延迟加载**。
+- **根因 A（最致命，之前完全没发现）**：托管平台对**所有静态资源**都校验 `?sharecode=...`，不带就返回「链接不完整」HTML（或 403）。而 `store.js` 里 `CONTENT_URL='./content.json'`、`META_URL='./meta.json'` 都**没带门禁参数** → 所有同域兜底请求其实都拿到 HTML，`r.json()` 抛错后被 `catch` 静默吞掉 → **同域兜底链完全失效**，只剩时好时坏的 GitHub raw 一条路。
+- **根因 B（v66 残留）**：`readHash()` 用 `Promise.all([metaP, sizeP])`，其中 `sizeP` 是对 GitHub raw 的 **HEAD 请求且没有超时**。国内网络一挂起，`Promise.all` 永不完成 → `checkContentUpdate()` 永远不执行 → localStorage 里的 v66 缓存永不更新，只能靠反复刷新碰运气。加上 SW 对 `content.json` 用 `staleWhileRevalidate`，还会把「链接不完整」HTML 和带 `_h=` 时间戳的 raw 副本写进缓存。
+- **根因 C（登录慢）**：v78 的 `enterAdmin()` 虽然改成同域优先，但**每次登录仍无条件 await 一次 GitHub raw 并等满 6s 超时** → 固定 6 秒起跳。
+- **根因 D（延迟大）**：v78 把外壳 js/css 全改成 `netFirst` + `cache:'reload'`，每次打开都强制重下全部脚本，首屏被网络往返拖慢。
+- **修复（提交 `fee1f2d`，SW v79）**：
+  - `js/store.js` 重写数据层：`gate()` 给同域资源自动补 `sharecode`；新增统一 `fetchT()`（AbortController 超时：同域 6s、首访 8s、GitHub raw 2.5s）；`fetchContent()` 有缓存**立即返回**，同时**每次启动都强制刷一次同域最新内容**，`applyFresh()` 比对后写缓存并 `onUpdate` 重绘；`crossCheckGithub()` 纯异步比对 GitHub/同域 `meta.json` 的 `contentHash`，仅当 GitHub 更新才拉全量；删除 `readHash/checkContentUpdate/fetchJson/activeContentUrl`。
+  - `js/admin.js`：`enterAdmin()` **登录零等待**——本机草稿/缓存立即 `renderShell()`，同域 `content.json?sharecode=...&pv=1` 用 6s 超时异步校正，只重绘当前面板、用户输入中不打断；彻底删掉登录链路的 GitHub raw 6s 等待；`prepareContent()`/`resolveContent()` 抽出复用；手动「从线上重新加载」与 PAT 发布的 4 个 fetch 全部加超时。
+  - `sw.js`：`content.json`/`meta.json`/`guide.html` **完全放行不进缓存**；外壳改回 `staleWhileRevalidate` 缓存优先秒开（新 SW install 已用 `cache:'reload'` 预缓存新壳，配合 `controllerchange` 自动 reload 保证部署后一次刷新生效）；导航/后台页仍网络优先。
+  - `guide.html`：数据源改**同域优先**（带门禁 + 6s 超时），GitHub raw 仅 2.5s 超时兜底；删掉未用的 `headLen/loadFull`。
+  - `js/app.js`：一键安装用 `location.replace(apkUrl)` 替换内容界面（返回键回不到内容页）；PWA standalone 下用 `window.open(apkUrl,'_blank')` 交系统浏览器打开独立下载页。`isWebView` 隐藏逻辑**原样未改**（APP 内仍不显示按钮）。
+- **⚠️ 后台地址更正（实测）**：`admin.html?key=nebadmin2026` 单独访问会被平台 **403「链接不完整」**；`admin.html?sharecode=AK6QIELR67` 会被 admin.js 挡成 404。**正确地址必须两个参数都带**：`https://content-box-24323.app.workbuddy.host/admin.html?sharecode=AK6QIELR67&key=nebadmin2026`。用户之前无痕窗口打不开后台、手机 APP 能进，正是平台 Cookie（`__wb_rsc`，30 天）有无造成的差异。
+- **验证**：本地用 vm 模拟「GitHub raw 永久挂起」→ 首屏 1ms 返回缓存、500ms 内 `onUpdate` 把 v66 刷成最新 ✅；线上 sw=v79 / `&v=79` / `meta.json contentHash=v79-sync-20261104-1905`；同域 `content.json?sharecode=...&_h=` 200 且 0.55s、后台同域请求 0.52s、引导页 0.24s；三端 content.json 一致（8 篇、v76 文案、guide 已启用、apkUrl 指向引导页）。已推 GitHub 并重部署（appId 不变，链接不变）。
+- **注意**：用户浏览器里若仍是 v78 旧 SW，第一次打开会自动 reload 一次接管 v79；localStorage 里的 v66 旧缓存会在新版 store.js 首次加载后被同域最新内容覆盖并自动重绘，无需手动清站点数据。
+
 *本手册由助手在 v69 发布后整理并更新，作为跨设备恢复上下文使用。*
