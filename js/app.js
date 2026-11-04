@@ -212,7 +212,7 @@
       });
       // 注册 URL 带 &v= 版本号：每次部署脚本地址都不同，浏览器必须重新下载 SW，
       // 不再依赖对 sw.js 的 HTTP 缓存复用，从而「一次刷新就生效」，杜绝反复刷新才更新的卡顿。
-      navigator.serviceWorker.register('sw.js?sharecode=AK6QIELR67&v=77').then(function (reg) {
+      navigator.serviceWorker.register('sw.js?sharecode=AK6QIELR67&v=78').then(function (reg) {
         if (!reg) return;
         // 主动触发一次更新检查（register 本身也会检查，这里再兜一层，缩短检测时延）
         if (reg.update) { try { reg.update(); } catch (e) {} }
@@ -797,10 +797,12 @@
 
     if (!isWebView) {
       $('#installAppBtn').addEventListener('click', function () {
-        if (window.__installPrompt) { installNow(); return; }
+        // 微信 / 苹果优先给对应引导；其余网页端一律跳后台配置的 apkUrl（现为引导页）。
+        // 不能让 beforeinstallprompt 抢先触发 PWA 安装，否则点「一键安装」不会跳引导页。
         if (isWx) { toast('请点右上角 ··· 在浏览器中打开本页后再下载'); return; }
         if (isIOS) { showAddHomeGuide(); return; }
         if (apkUrl) { location.href = apkUrl; return; }
+        if (window.__installPrompt) { installNow(); return; }
         toast('请用浏览器菜单「安装 / 添加到主屏幕」');
       });
       // 二维码编码「下载引导页」：普通网页链接，不会被微信/QQ 等扫码工具拦截（之前直接用 .apk 直链会提示「停止访问」）

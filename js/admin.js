@@ -87,6 +87,18 @@
   // 从 URL 取分享码，用于拉取线上最新内容时带上
   const SC = (function () { try { return new URLSearchParams(location.search).get('sharecode') || 'AK6QIELR67'; } catch (e) { return 'AK6QIELR67'; } })();
 
+  // 带超时的 fetch：GitHub raw 跨境可能 20s+，绝不能让后台登录无限等待
+  function fetchWithTimeout(url, opts, ms) {
+    return new Promise(function (resolve, reject) {
+      const ctl = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+      const timer = setTimeout(function () { if (ctl) ctl.abort(); reject(new Error('timeout')); }, ms);
+      const o = Object.assign({}, opts || {});
+      if (ctl) o.signal = ctl.signal;
+      fetch(url, o).then(function (r) { clearTimeout(timer); resolve(r); },
+                         function (e) { clearTimeout(timer); reject(e); });
+    });
+  }
+
   function versionOf(d) {
     const a = (d && d.config && d.config.aboutApp) || '';
     const m = a.match(/v(\d+)/);
@@ -161,7 +173,7 @@
   // 后台门禁：仅在 URL 带正确 key 时加载，否则显示 404 并中止（公开端无入口）
   const ADMIN_KEY = 'nebadmin2026';
   // 已部署的 APK 直装链接（兜底默认值，仅当用户未自行填写时填入后台输入框；可随时在后台修改）
-  const DEPLOYED_APK_URL = 'https://content-box-24323.app.workbuddy.host/app.apk?sharecode=AK6QIELR67';
+  const DEFAULT_INSTALL_URL = 'https://content-box-24323.app.workbuddy.host/guide.html?sharecode=AK6QIELR67';
   if (new URLSearchParams(location.search).get('key') !== ADMIN_KEY) {
     app.innerHTML = '<div style="padding:80px 20px;text-align:center;color:#bbb;font-size:14px">404 · 页面不存在</div>';
     return;
@@ -217,50 +229,62 @@
       + '<button class="btn" id="loginBtn">登录</button>'
       + '<p class="login-hint">密码为固定口令，无法在界面上修改或重置；请勿将本后台链接转发给他人。</p></div>';
     $('#loginBtn').onclick = async function () {
-      if (await CBStore.verifyPassword($('#pw').value)) enterAdmin();
-      else toast('密码错误');
+      if (!(await CBStore.verifyPassword($('#pw').value))) { toast('密码错误'); return; }
+      const btn = $('#loginBtn');
+      if (btn) { btn.disabled = true; btn.textContent = '正在载入…'; }
+      try { await enterAdmin(); }
+      catch (e) {
+        // 任何异常都保证能进后台，绝不把用户卡在登录页
+        try { content = content || CBStore.loadDraft() || (await CBStore.fetchContent()); } catch (e2) {}
+        if (content) { if (!content.config) content.config = {}; renderShell(); toast('已用本机数据进入后台'); }
+        else if (btn) { btn.disabled = false; btn.textContent = '登录'; toast('载入失败，请重试'); }
+      }
     };
   }
 
   async   function enterAdmin() {
-    // 拉取线上最新内容：优先读 GitHub 源（与前端同一份，确保「后台改完发布」后台自身也能看到），
-    // 失败再回退到托管平台 ./content.json
+    // 同域优先（部署时已与 GitHub 同步，毫秒级返回）。GitHub raw 跨境实测可达 20s+，
+    // 因此只作为「线上版本更新」的可选校验并加 6s 超时，绝不让后台登录干等。
     let pub = null;
     try {
-      const r = await fetch(GH_RAW + '?t=' + Date.now(), { cache: 'no-store' });
+      const r = await fetch('./content.json?sharecode=' + encodeURIComponent(SC) + '&pv=1', { cache: 'no-store' });
       if (r.ok) pub = await r.json();
     } catch (e) { pub = null; }
-    if (!pub) {
-      try {
-        const r2 = await fetch('./content.json?sharecode=' + encodeURIComponent(SC) + '&pv=1', { cache: 'no-store' });
-        if (r2.ok) pub = await r2.json();
-      } catch (e) { pub = null; }
-    }
+    try {
+      const gh = await fetchWithTimeout(GH_RAW + '?t=' + Date.now(), { cache: 'no-store' }, 6000);
+      if (gh.ok) {
+        const g = await gh.json();
+        if ((parseInt(versionOf(g), 10) || 0) > (parseInt(versionOf(pub), 10) || 0)) pub = g;
+      }
+    } catch (e) { /* 超时或失败：沿用同域版，不影响进入后台 */ }
     const draft = CBStore.loadDraft();
     if (!pub) {
-      // 离线或拉取失败：退而用草稿 / 缓存
       content = draft || (await CBStore.fetchContent());
-      if (content) CBStore.saveDraft(content);
+      if (content) saveLocalOnly(content);
     } else if (!draft) {
       content = pub;
-      CBStore.saveDraft(content);
+      saveLocalOnly(content);
     } else {
-      // 草稿与线上同源？同一发布基准 → 保留本机编辑；线上已更新 → 以线上打底并补回本地独有项
       const pubTs = (pub.deployMeta && pub.deployMeta.ts) || '';
       const dftTs = (draft.deployMeta && draft.deployMeta.ts) || '';
-      if (dftTs && pubTs && dftTs < pubTs) {
+      const gPub = (pub.config && pub.config.guide) || {};
+      const gDft = (draft.config && draft.config.guide) || {};
+      // 草稿明显陈旧（引导页被清空/未启用、或缺 apkUrl）时以线上已发布版为权威，
+      // 修掉「换个窗口/手机进后台，引导页设置变空、一键安装丢失」的老问题
+      const draftStale = (!gDft.enabled && !!gPub.enabled) || !(draft.config && draft.config.apkUrl);
+      if (draftStale || (dftTs && pubTs && dftTs < pubTs)) {
         content = rebaseDraft(pub, draft);
-        toast('已同步线上最新内容（v' + versionOf(pub) + '）');
+        toast('已同步线上最新设置（v' + versionOf(pub) + '）');
       } else {
         content = draft;
       }
-      CBStore.saveDraft(content);
+      saveLocalOnly(content); // 进入后台本身绝不触发自动发布，避免旧草稿写回仓库
     }
     if (!content.config) content.config = {};
     // 引导页默认值：关闭状态，内容留空（用户在后台「引导页」编辑并发布后再启用）
     if (!content.config.guide) content.config.guide = { enabled: false, title: '', subtitle: '', intro: '', apkUrl: '', buttonText: '立即下载安装', icon: '' };
-    // 兜底：未填 APK 链接时，把已部署的直装地址预填进后台，避免输入框一直为空（用户可随时改）
-    if (!content.config.apkUrl) content.config.apkUrl = DEPLOYED_APK_URL;
+    // 兜底：未填安装链接时默认指向引导页（普通网页），避免一键安装变成直接下载 .apk
+    if (!content.config.apkUrl) content.config.apkUrl = DEFAULT_INSTALL_URL;
     // 后台界面：按本机「暗调开关」决定自身是否转暗调（默认浅色）；暗调套用后台调好的暗调参数
     document.body.classList.toggle('admin-dark', getAdminDim());
     applyAdminTheme();
