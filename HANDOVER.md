@@ -36,6 +36,24 @@
 
 ---
 
+## 0a. ⚠️ 强制工作流：每次部署 / 优化界面 / 改内容前，必须先核对 GitHub 仓库（用户 2026-11-04 指令）
+
+> **目的**：用户会手动在 GitHub 网页端改 `content.json`（或版本号/文章），本地 `pwa-content-app` 可能滞后；若直接部署会把仓库冲掉（已发生 `f2d028f` 事故，把引导页配置清空）。
+
+**收到任何「部署 / 优化界面 / 修改或新增内容」类任务时，第一步不是改代码，而是先跑下面核对：**
+```bash
+cd pwa-content-app
+git fetch origin
+git log --oneline HEAD..origin/main                # 非空 = 远程有本地没有的提交（用户手动改过）
+git diff --stat HEAD origin/main -- content.json   # 重点：用户常手动改 content.json
+git diff --stat HEAD origin/main                   # 其他文件差异摘要
+```
+- 若 `origin/main` 领先本地（尤其 `content.json`）：**先同步到本地再继续**（如 `git show origin/main:content.json > content.json`，或 `git pull --ff-only` / `git merge`），并明确告知用户「发现你手动在仓库改了 X，已同步后继续」。
+- 若仅本地领先（我的未推送提交）：正常继续，结束后提交+部署，保持托管与 GitHub 两份一致。
+- 完成后：托管平台 `./content.json`（后台读取源）与 GitHub `content.json`（前端/引导页源）必须都更新到同一最终版。
+
+---
+
 ## 2. GitHub 仓库的双重角色
 
 仓库 `C-Abai/AbaiDeNeiRongHeZi` 同时是：
@@ -107,6 +125,13 @@
 - ⚠️ **SW 注册地址版本号必须同步自增**：`js/app.js` 里 `navigator.serviceWorker.register('sw.js?sharecode=AK6QIELR67&v=XX')` 的 `&v=` 与 `sw.js` 的 `CACHE` 版本号**必须一起 +1**（当前 v76）。
   原因：注册 URL 带版本号后，每次部署脚本地址都不同，浏览器会强制重新下载 SW，实现「一次刷新即生效」；若只升 `CACHE` 不升 `&v=`，旧 app.js 仍注册旧 URL，浏览器会复用缓存中的旧 SW，导致更新卡住、要反复刷新才生效（2026-11-04 用户反馈「刷新好久」即此问题）。
 - 发布后提醒用户**杀 PWA 后台重进或 Ctrl+Shift+R 强刷一次**，让新的 Service Worker 接管（首次升级到带 &v= 机制需一次强刷，之后每次部署自动一次刷新即更新）。
+
+### ⚠️ 数据源分裂与「手动 git 提交会冲掉引导页」的坑（2026-11-04 真实事故）
+- **两套数据源**：`js/store.js` 的公开端/引导页读 **GitHub raw** 的 `content.json`；但**后台 `admin.js` 读的是托管平台的 `./content.json`**（部署时由本地文件拷上去的）。两者必须保持一致，否则后台与公开端会显示不同内容。
+- **后台"保存"只写浏览器 localStorage 草稿，不进仓库**；"发布"= 助手把 `content.json` 推到 GitHub（公开端生效）。
+- **手动 `git commit/push` 推的是本地 `content.json` 文件**——而本地文件若只是 v70 那份（引导页空、一键安装是 `.apk` 直链），一提交就会把线上正确的引导页配置覆盖成空（2026-11-04 用户 `f2d028f` 提交即此：基于 v70 空引导页 + 改了版本号，把引导页配置清空）。
+- **修复**：以用户提交版（含其版本号改动 + `apkUrl=引导页`）为基础，`git show <提交>:content.json` 取出后注入正确的 `config.guide` 块（enabled/title 等），再 `git pull --rebase origin main` 推送；并重新部署使托管 `./content.json` 同步。
+- **教训**：以后任何修改 content.json 的发布，务必让本地文件 = 仓库/GitHub 的最终正确版（含引导页配置）再提交，且提交后重新部署一次，保证托管与 GitHub 两份一致；并提醒用户：改完后台后**清一次浏览器站点数据（localStorage）**再刷新，否则旧缓存（cb_content_cache_v1 / cb_admin_draft_v1）会持续显示旧内容。
 
 ## 5c. 换设备不换链接 · 实测步骤（2026-11-04 真实新设备测试：失败→已定位根因）
 
