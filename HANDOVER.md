@@ -301,4 +301,16 @@ git diff --stat HEAD origin/main                   # 其他文件差异摘要
 - **已知限制**：① GitHub raw 有 CDN 缓存，虽加了 query bust，极端情况下仍可能有 1–5 分钟延迟；② 托管平台 `./content.json` 不会随浏览器自动发布更新，只有助手重新部署才同步（它是 GitHub 不可达时的兜底，可能显旧版）；③ PAT 存本机浏览器，公用电脑慎用，泄露可删令牌撤销。
 - **部署**：SW 升 `v76→v77`（`sw.js` CACHE、`meta.json` 的 sw、`js/app.js` 注册 `&v=77` 三处必须同步）。提交 `f38e980` 已推 GitHub，已重部署 `pwa-content-app`（同 appId `…24323`）。线上验证：sw=v77、app.js `&v=77`、admin.js 含 `emitPublishSignal/gh_reload/saveLocalOnly/GH_META_API`、store.js 含 `withBust` 且 3 处 bust 调用、托管与 GitHub 的 meta.json 均为 v77、content.json 仍为 v76（引导页启用、8 篇文章）。
 
+## 2026-11-04 补充：修复后台登录卡死 + 网页端一键安装不跳引导页（v78）
+
+- **症状**：① 公开端进后台输密码「没反应、打不开」；② 网页端点「一键安装」不跳引导页。用户明确要求 **APP 内（WebView）仍隐藏安装按钮，不放开**。
+- **根因 1（登录卡死）**：v77 把 `enterAdmin()` 改成「优先读 GitHub raw」，实测该请求跨境拉 1.28MB 需 **21.8s**，且无超时、无 loading，界面一直停在登录页。属 v77 回归。
+- **根因 2（不跳引导页）**：`js/app.js` 关于页按钮原来**先判断 `window.__installPrompt`**（浏览器 PWA 安装提示），命中就 `installNow()` 并 return，轮不到 `location.href = apkUrl`。桌面 Chrome/Edge 打开 PWA 很容易触发该提示。另：`contentHash` 长期未变（`189baf05e9ee114b`），公开端指纹比对跳过 → 一直吃旧缓存；后台 `apkUrl` 为空时兜底填的还是 `.apk` 直链。
+- **修复**：
+  - `js/admin.js`：新增 `fetchWithTimeout(url, opts, ms)`（AbortController）；`enterAdmin()` 改为**同域 `./content.json` 优先**（毫秒级），GitHub raw 仅作「线上版本更高」的可选校验并加 **6s 超时**；登录按钮点击后显示「正在载入…」并加整体 try/catch 兜底，任何异常都能进后台；草稿明显陈旧（guide 未启用 / 缺 apkUrl）时以线上已发布版为权威（`draftStale`）；进入后台一律用 `saveLocalOnly()` 而非 `CBStore.saveDraft()`，**避免每次登录触发自动发布把旧草稿写回仓库**；`DEPLOYED_APK_URL` 改名 `DEFAULT_INSTALL_URL` 并改指向引导页。
+  - `js/app.js`：关于页按钮优先级改为 微信 → 苹果（`showAddHomeGuide`）→ **`apkUrl`（跳引导页）** → PWA 安装提示 → toast。`isWebView` 隐藏逻辑**完全未改**（APP 内仍只显示"已在 App 内打开"）。
+  - `meta.json` 的 `contentHash` 改为 `v78-sync-20261104-1825`（首次主动变更，强制所有设备重新拉内容）；SW 升 `v77→v78`（`sw.js` CACHE、`js/app.js` 注册 `&v=78`、`meta.json` 的 sw 三处同步）。
+- **线上验证**：sw=v78、app.js `&v=78`、app.js 中 `apkUrl` 判断位于 PWA 安装提示之前且 WebView 隐藏逻辑原样、admin.js 含 `fetchWithTimeout/正在载入/saveLocalOnly(content)/DEFAULT_INSTALL_URL/draftStale`、托管与 GitHub 的 meta.json 均为新指纹、`content.json` 的 `apkUrl` 指向引导页且 guide 已启用。提交 `943eabd` 已推 GitHub 并重新部署。
+- **注意**：改 `contentHash` 会让所有设备下次打开重新下载 1.28MB content.json（预期行为，用于清掉旧缓存）。后台仍建议 `Ctrl+Shift+R` 强刷一次加载 v78 的 admin.js。
+
 *本手册由助手在 v69 发布后整理并更新，作为跨设备恢复上下文使用。*
