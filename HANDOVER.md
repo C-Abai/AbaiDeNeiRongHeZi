@@ -286,4 +286,19 @@ git diff --stat HEAD origin/main                   # 其他文件差异摘要
 - **部署**：SW 升 `v74→v75`（`sw.js`/`meta.json`），已重部署 `pwa-content-app`。验证：线上 sw=v75、sw.js 含 `mode==='navigate'` 分支、guide.html 含 `loadFull()`、app.js 含 `showAddHomeGuide`、style.css 含 `ios-guide-mask`。
 - **注意**：关于页与引导页读的是**同一份** GitHub `content.json`（`store.js` 第14行 `GITHUB_CONTENT_URL` 与 `guide.html` 第87行同源），故数据不会"关于页更新、引导页不更新"；若引导页显「尚未配置」，先确认后台「引导页」已启用并「发布」推到 GitHub。
 
+## 2026-11-04 补充：后台「保存即发布」到 GitHub（v77）
+
+- **需求**：用户要求「只要登录后台修改了设置，这个设置就要同步更新到所有设备」。根因：后台「保存」只写本机 localStorage 草稿，换窗口/手机没有草稿 → 回落旧版 → 引导页设置显示空白。
+- **实现（三处数据源统一到 GitHub）**：
+  - `js/admin.js` 新增 `GH_OWNER/GH_REPO/GH_BRANCH/GH_PATH/GH_API/GH_META_API/GH_RAW` 常量；`ghToken()/ghAuto()/setGhToken()/setGhAuto()` 读写 localStorage（`cb_admin_gh_token`、`cb_admin_gh_autopub`）。**令牌只存本机浏览器，绝不入仓库/前端。**
+  - `publishToGitHub(data, silent)`：GET 当前文件 sha → PUT `content.json`（base64，UTF-8 用 `btoa(unescape(encodeURIComponent(...)))`）→ 调 `emitPublishSignal()`。`_publishing` 锁 + `_pendingData` 合并连续保存，保证最后一份一定发出。
+  - `emitPublishSignal(tok)`：**关键**。发布后同步 PUT GitHub 上的 `meta.json`，把 `contentHash` 改成新值。否则公开端 `readHash()` 靠 `meta.json` 指纹 + raw `Content-Length` 判断变化，两者都不变时（尤其内容字节数不变）其他设备会一直吃旧缓存、看不到新设置。
+  - `CBStore.saveDraft` 包装层在 `ghAuto() && ghToken()` 时静默调用 `publishToGitHub`；`saveLocalOnly()` 用 `_skipAutoPub` 绕过发布（供「仅存本机草稿」用）。
+  - `enterAdmin()` 改为**优先读 GitHub raw**（`GH_RAW + '?t=' + Date.now()`，与公开端同源），失败回退托管 `./content.json`。
+  - 「发布」tab 新增：PAT 输入框、自动发布开关、保存令牌配置、🚀 立即发布当前内容、清除令牌；另加「🔄 从线上重新加载」按钮（`gh_reload`）用 GitHub 最新内容覆盖本机旧草稿，解决单设备显示旧内容/引导页变空。
+- **`js/store.js` 缓存穿透**：新增 `withBust(url)`（附 `_h=Date.now()`）；`fetchJson(url, fallback, bust)` 加第三参；首次拉取、`readHash()` 的 meta 读取、`checkContentUpdate()` 的全量拉取均传 `bust=true`，避免 GitHub raw CDN 缓存挡住新内容。
+- **前置条件（务必告知用户）**：自动发布**必须先在「发布」tab 填 GitHub PAT**（classic token 勾 `repo`，或 fine-grained 勾 `Contents: write`）。未配置令牌时不会自动同步，仍走「导出 content.json → 助手推上线」老流程。
+- **已知限制**：① GitHub raw 有 CDN 缓存，虽加了 query bust，极端情况下仍可能有 1–5 分钟延迟；② 托管平台 `./content.json` 不会随浏览器自动发布更新，只有助手重新部署才同步（它是 GitHub 不可达时的兜底，可能显旧版）；③ PAT 存本机浏览器，公用电脑慎用，泄露可删令牌撤销。
+- **部署**：SW 升 `v76→v77`（`sw.js` CACHE、`meta.json` 的 sw、`js/app.js` 注册 `&v=77` 三处必须同步）。提交 `f38e980` 已推 GitHub，已重部署 `pwa-content-app`（同 appId `…24323`）。线上验证：sw=v77、app.js `&v=77`、admin.js 含 `emitPublishSignal/gh_reload/saveLocalOnly/GH_META_API`、store.js 含 `withBust` 且 3 处 bust 调用、托管与 GitHub 的 meta.json 均为 v77、content.json 仍为 v76（引导页启用、8 篇文章）。
+
 *本手册由助手在 v69 发布后整理并更新，作为跨设备恢复上下文使用。*
