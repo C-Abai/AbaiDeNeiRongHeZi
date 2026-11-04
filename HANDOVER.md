@@ -97,13 +97,48 @@
   - `appId` = `wbapp_jFiM5Y7b9RmUulYAimy36N`（复用则链接不变）
   - `userAskedToPublish` = `true`（用户说「发布 / 上线」时才置真）
 - 流程：改完项目文件 → 告诉助手「发布」→ 助手部署 → 链接不变。
-- ⚠️ **跨设备部署铁律（最重要，已据 2026-11-03 失败修正）**：发布系统按「**部署目录 → 应用的映射**」定位目标，**appId 参数在目录不匹配时会被静默忽略**。映射记录在旧设备工作区根目录的 `.workbuddy/applications.yaml`（`locator: wbapp_jFiM5Y7b9RmUulYAimy36N`）与 `.wbapp_jFiM5Y7b9RmUulYAimy36N.genie`（`localDir` 指向本项目）。
-  - **正确做法**：要覆盖原链接 `…24323`，**必须从已映射的原始目录部署**，即旧设备的 `C:\Users\Administrator\WorkBuddy\2026-10-27-16-09-30\pwa-content-app`。该目录的映射命中 `wbapp_jFiM5Y7b9RmUulYAimy36N` → 覆盖原链接，不新建。
-  - **错误做法（会新建链接）**：在新设备/任意没有该目录映射的地方部署，即便显式传 appId，工具也会因目录无映射而**静默忽略 appId、新建链接**（2026-11-03 因此误生 `…87884`，已下架；更早 `…22321` 同理）。
-  - **结论**：appId 只在「目录已映射到它」时才生效；换设备第一要务是**复用含映射的原始目录**，而不是只传 appId。新设备若要覆盖，需先把原始目录（含 `.genie`/`.workbuddy` 映射）整体迁过去，或回到旧设备部署。
+- ⚠️ **跨设备部署铁律（已实测验证，2026-11-04 修正）**：发布系统按「**部署目录 → 应用的映射**」定位目标，映射记录在**工作区根目录**（即项目文件夹的父目录）的 `.wbapp_<appId>.genie` 与 `.workbuddy/applications.yaml` 两个文件里。工具扫工作区根找 genie → 命中 appId 就覆盖原链接，找不到就静默新建。
+  - **换设备不换链接（已实测可行）**：满足 ① 登录**同一个 WorkBuddy 平台账号**；② 把这两个映射文件放到新设备的**工作区根目录**（不是项目里面）；③ `localDir` 改成新设备实际路径 —— 即可从任意新路径部署并覆盖 `…24323`。2026-11-04 已在本机用**全新路径 + 同账号**实测：部署时工具解析到 `wbapp_jFiM5Y7b9RmUulYAimy36N`（**未新建链接**），铁证成立。
+  - **2026-11-03 失败的真实原因**：当时把 genie/yaml 放进了**项目子目录里**（被文档 "inside the directory" 字面误导），工具在工作区根扫不到 → 当新应用，误生 `…87884`（已下架）。**关键：genie 必须在「工作区根目录」，不是项目内。**
+  - 部署时不要传 `appId`（工具靠目录 + genie 自动命中）；只有 `unpublish` 多应用时才需要 `appId`。
+  - 详见下方「§5c 换设备不换链接 · 实测步骤」。
 - ⚠️ **改 CSS/JS 后必须升 Service Worker 版本号**：改 `sw.js` 里的 `CACHE = 'contentbox-vXX'` 与 `meta.json` 的 `sw` 字段到新版本，
   否则老用户浏览器缓存名不变，会继续加载旧界面、看不到新优化。
 - 发布后提醒用户**杀 PWA 后台重进**，让新的 Service Worker（当前 v69）接管缓存。
+
+## 5c. 换设备不换链接 · 实测步骤（2026-11-04 验证可行）
+
+目标：在新设备部署，覆盖原链接 `…24323`，**不新建链接**。
+
+前提：新设备登录**同一个 WorkBuddy 平台账号**（与创建 `…24323` 的是同一个；与 Windows 本机用户名 `C:/Users/xxx` 无关——那是系统用户目录，不是平台账号）。
+
+步骤：
+1. 把项目弄到新设备（clone 仓库，或拷目录）。假设新设备工作区为 `WS\`，项目在 `WS\pwa-content-app\`。
+2. 在**工作区根目录 `WS\`**（直接包含项目文件夹的那一层，**不是** `WS\pwa-content-app\` 里面）放两个文件：
+   - `WS\.wbapp_jFiM5Y7b9RmUulYAimy36N.genie`
+   - `WS\.workbuddy\applications.yaml`
+3. 文件内容（⚠️ `localDir` 必须改成新设备实际路径）：
+   - `.wbapp_jFiM5Y7b9RmUulYAimy36N.genie`：
+     ```
+     appId: wbapp_jFiM5Y7b9RmUulYAimy36N
+     name: 内容盒子
+     localDir: WS\pwa-content-app
+     appType: web
+     entryHtml: index.html
+     ```
+   - `.workbuddy\applications.yaml`：
+     ```
+     applications:
+       - name: 内容盒子
+         locator: wbapp_jFiM5Y7b9RmUulYAimy36N
+     ```
+4. 部署：`directory = WS\pwa-content-app`，`language = static`，`entryHtml = index.html`，`userAskedToPublish = true`。**不要传 appId**（工具靠目录 + 工作区根 genie 自动命中）。
+5. 工具扫到 `WS\.wbapp_*.genie` → 命中 `wbapp_jFiM5Y7b9RmUulYAimy36N` → 覆盖 `…24323`，不新建。
+
+⚠️ 坑与补救：
+- genie/yaml 放错位置（放进项目子目录）→ 工具扫不到 → 静默新建链接（2026-11-03 的 `…87884` 即此）。务必放在**工作区根目录**。
+- 部署偶发 `SITES_START_FAILED`（沙箱冷启动 60s 超时，非代码问题）：重试一次即可。
+- 若某次失败且指向现有 appId，**原链接可能暂时打不开**——立刻从原始目录（或本机）重部署一次恢复。新设备首次部署建议守在旁边，失败即从原目录补一次。
 
 ---
 
@@ -112,7 +147,7 @@
 - **直链必须带 `?sharecode=AK6QIELR67`**：实测不带 sharecode（或只留 `?`、或空参数）服务器直接返回 `403 Forbidden`，下不到包。`sharecode` 是下载 APK 的访问钥匙，不是可省略的追踪参数。故 `content.json` / `download.html` / 后台「APK 直装链接」里的 `apkUrl` **必须保留完整 sharecode**。
 - **短链（发人更短，不影响任何同步）**：`https://tinyurl.com/2czwkvaw` —— 仅做 301 跳转到上面的完整直链，最终下到的还是同一份 APK（已验证 `200` + 8.7MB）。它**不影响**原直链、已装 APK 的内容同步（APK 同步靠拉 PWA 的 `content.json`，与下载链接无关）、网页同步。短链依赖第三方 TinyURL，长期分发请以原直链兜底。
 - **微信/QQ 内仍可能拦截**：直链与短链在微信里都可能被拦（之前直链就被提示「停止访问」），微信场景改用「二维码跳网页」最稳。
-- **换设备重部署覆盖原链接**：见 §5「跨设备部署铁律（修正版）」——**必须从含映射的原始目录部署**才能覆盖 `…24323`；仅传 appId 在新设备上会被静默忽略并新建链接（2026-11-03 已踩坑 `…87884`）。
+- **换设备重部署覆盖原链接**：见 §5c「换设备不换链接 · 实测步骤」——登录同账号 + 把 `.wbapp_*.genie` 与 `.workbuddy/applications.yaml` 放到**工作区根目录**（非项目内）即可从任意新路径覆盖 `…24323`（2026-11-04 已实测验证）。
 - **小米应用商店误报（当前部署 v69，隐藏逻辑于 v68 引入）**：v69 已在 APK 内（WebView，`; wv)` UA）隐藏「下载 APK」按钮；但 `content.json` 的 `apkUrl`、`download.html` 自动下载页、`admin.js` 里的硬编码直链仍含 `.apk` 字面量。若小米仍报「APK 内诱导下载」，系扫描器静态/全站匹配「.apk 下载能力」所致。若要彻底过：把 `apkUrl` 移出 `content.json`、删除 `download.html`、清理 `admin.js` 硬编码（纯前端改造，无需动 ToAPP 后台、无需换直链）。当前用户选择暂不改动。
 
 ---
