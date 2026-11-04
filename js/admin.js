@@ -176,6 +176,8 @@
       CBStore.saveDraft(content);
     }
     if (!content.config) content.config = {};
+    // 引导页默认值：关闭状态，内容留空（用户在后台「引导页」编辑并发布后再启用）
+    if (!content.config.guide) content.config.guide = { enabled: false, title: '', subtitle: '', intro: '', apkUrl: '', buttonText: '立即下载安装', icon: '' };
     // 兜底：未填 APK 链接时，把已部署的直装地址预填进后台，避免输入框一直为空（用户可随时改）
     if (!content.config.apkUrl) content.config.apkUrl = DEPLOYED_APK_URL;
     // 后台界面：按本机「暗调开关」决定自身是否转暗调（默认浅色）；暗调套用后台调好的暗调参数
@@ -192,6 +194,7 @@
       + '<div class="admin-tabs"><button class="tab active" data-t="posts">内容</button>'
       + '<button class="tab" data-t="settings">站点设置</button>'
       + '<button class="tab" data-t="tools">工具栏</button>'
+      + '<button class="tab" data-t="guide">引导页</button>'
       + '<button class="tab" data-t="publish">发布</button></div>'
       + '<div id="panel"></div>';
     $('#logout').onclick = function () { boot(); };
@@ -224,6 +227,7 @@
     if (which === 'posts') renderPosts(panel);
     else if (which === 'settings') renderSettings(panel);
     else if (which === 'tools') renderTools(panel);
+    else if (which === 'guide') renderGuide(panel);
     else renderPublish(panel);
   }
 
@@ -637,6 +641,37 @@
       { id: 't_imgcompress', name: '🖼 图片压缩', engine: 'imgcompress', enabled: true, order: 8 },
       { id: 't_pomodoro', name: '🍅 番茄钟', engine: 'pomodoro', enabled: true, order: 9 }
     ];
+  }
+
+  function renderGuide(panel) {
+    const g = (content.config && content.config.guide) || {};
+    panel.innerHTML = '<div class="admin-list">'
+      + '<div class="sub">📥 引导下载页（独立网页 <code>guide.html</code>，用于引导用户下载安装 APK）</div>'
+      + '<div class="checkbox-row"><input type="checkbox" id="g_enabled" ' + (g.enabled ? 'checked' : '') + '/><label for="g_enabled">启用引导页（关闭时访问引导页显示「未配置」占位）</label></div>'
+      + '<div class="field"><label>页面标题</label><input type="text" id="g_title" value="' + esc(g.title || '') + '" placeholder="如：内容盒子"/></div>'
+      + '<div class="field"><label>副标题 / 应用名</label><input type="text" id="g_subtitle" value="' + esc(g.subtitle || '') + '" placeholder="如：你的随身内容工具"/></div>'
+      + '<div class="field"><label>内容介绍（支持换行）</label><textarea id="g_intro" class="auth-textarea">' + esc(g.intro || '') + '</textarea></div>'
+      + '<div class="field"><label>APK 直装链接（留空则使用「站点设置」里的 APK 链接）</label><input type="text" id="g_apk" value="' + esc(g.apkUrl || '') + '" placeholder="https://.../app.apk?sharecode=..."/></div>'
+      + '<div class="field"><label>安装按钮文字</label><input type="text" id="g_btn" value="' + esc(g.buttonText || '立即下载安装') + '"/></div>'
+      + '<div class="field"><label>图标 / Logo 图片地址（留空则使用站点图标）</label><input type="text" id="g_icon" value="' + esc(g.icon || '') + '" placeholder="https://.../icon.png"/></div>'
+      + '<div class="row" style="margin-top:14px"><button class="btn" id="g_save">保存引导页设置</button>'
+      + '<a class="btn ghost" id="g_open" href="guide.html?sharecode=AK6QIELR67" target="_blank" rel="noopener">👁 打开引导页</a></div>'
+      + '<p class="help">引导页访问地址：<code>guide.html?sharecode=AK6QIELR67</code>。可把该链接发给用户，或在「站点设置 → APK 直装链接」里指向它，作为统一下载入口。</p></div>';
+
+    $('#g_save').onclick = function () {
+      content.config = content.config || {};
+      content.config.guide = {
+        enabled: $('#g_enabled').checked,
+        title: $('#g_title').value.trim(),
+        subtitle: $('#g_subtitle').value.trim(),
+        intro: $('#g_intro').value,
+        apkUrl: ($('#g_apk').value || '').trim(),
+        buttonText: ($('#g_btn').value || '立即下载安装').trim(),
+        icon: ($('#g_icon').value || '').trim()
+      };
+      CBStore.saveDraft(content);
+      toast('已保存（点「发布」推上线后生效）');
+    };
   }
 
   function renderTools(panel) {

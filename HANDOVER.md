@@ -159,11 +159,20 @@
 - **短链（发人更短，不影响任何同步）**：`https://tinyurl.com/2czwkvaw` —— 仅做 301 跳转到上面的完整直链，最终下到的还是同一份 APK（已验证 `200` + 8.7MB）。它**不影响**原直链、已装 APK 的内容同步（APK 同步靠拉 PWA 的 `content.json`，与下载链接无关）、网页同步。短链依赖第三方 TinyURL，长期分发请以原直链兜底。
 - **微信/QQ 内仍可能拦截**：直链与短链在微信里都可能被拦（之前直链就被提示「停止访问」），微信场景改用「二维码跳网页」最稳。
 - **换设备重部署覆盖原链接**：见 §5c「换设备不换链接 · 实测步骤」——登录同账号 + 把 `.wbapp_*.genie` 与 `.workbuddy/applications.yaml` 放到 **WorkBuddy 会话根目录**（即 `C:\Users\<用户>\WorkBuddy\<日期时间>\`，非项目内、也非项目父目录）即可覆盖 `…24323`（2026-11-04 真实测试先因位置错误失败，根因已定位，正确位置待复测确认）。
-- **小米应用商店误报（当前部署 v69，隐藏逻辑于 v68 引入）**：v69 已在 APK 内（WebView，`; wv)` UA）隐藏「下载 APK」按钮；但 `content.json` 的 `apkUrl`、`download.html` 自动下载页、`admin.js` 里的硬编码直链仍含 `.apk` 字面量。若小米仍报「APK 内诱导下载」，系扫描器静态/全站匹配「.apk 下载能力」所致。若要彻底过：把 `apkUrl` 移出 `content.json`、删除 `download.html`、清理 `admin.js` 硬编码（纯前端改造，无需动 ToAPP 后台、无需换直链）。当前用户选择暂不改动。
+- **小米应用商店误报（当前部署 v70，隐藏逻辑于 v68 引入）**：v70 已在 APK 内（WebView，`; wv)` UA）隐藏「下载 APK」按钮；但 `content.json` 的 `apkUrl`、`download.html` 自动下载页、`admin.js` 里的硬编码直链仍含 `.apk` 字面量。若小米仍报「APK 内诱导下载」，系扫描器静态/全站匹配「.apk 下载能力」所致。若要彻底过：把 `apkUrl` 移出 `content.json`、删除 `download.html`、清理 `admin.js` 硬编码（纯前端改造，无需动 ToAPP 后台、无需换直链）。当前用户选择暂不改动。
+
+## 5b-2. 引导下载页 `guide.html`（v70 新增）
+
+- **用途**：一个**独立的引导下载网页**，专门引导用户下载安装 APK（可用作「旧链接兜底 / 统一下载入口」）。访问地址：`guide.html?sharecode=AK6QIELR67`。
+- **数据来源**：拉取 `content.json` 的 `content.config.guide` 渲染，字段：`enabled / title / subtitle / intro / apkUrl / buttonText / icon`。
+  - 安装按钮点击 → 跳 `guide.apkUrl`；若其为空则回退到 `config.apkUrl`（站点 APK）。**注意 `apkUrl` 必须带完整 `?sharecode`**（见 §5b 第一条，否则 403）。
+  - `intro` 支持换行（页面按 `\n` 转 `<br>`）；`enabled=false` 时页面显示「尚未配置」占位。
+- **后台编辑**：内容盒子后台（admin.html）新增「**引导页**」tab（位于「工具栏」与「发布」之间），表单编辑上述 7 个字段，保存后点「发布」推上线即生效。后台另有「👁 打开引导页」直达链接。
+- **部署注意**：`guide.html` 是新增静态文件且 `admin.js` 已改，发布须升 SW 缓存版本（当前 `contentbox-v70`）并 `meta.json` 同步，否则后台与公开端可能读到旧缓存。
 
 ---
 
-## 6. 当前版本状态（v69）已实现的功能
+## 6. 当前版本状态（v70）已实现的功能
 
 - 顶部导航栏上移，减小上方空白（保留手机通知栏安全区）。
 - 顶部玻璃蒙版层（`backdrop-filter` 模糊），内容向上滑入时不再穿透到导航按钮 / 文字。
