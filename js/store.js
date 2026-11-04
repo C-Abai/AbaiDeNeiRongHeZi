@@ -15,10 +15,13 @@
   const GITHUB_META_URL = 'https://raw.githubusercontent.com/C-Abai/AbaiDeNeiRongHeZi/refs/heads/main/meta.json';
   function activeContentUrl() { return GITHUB_CONTENT_URL || CONTENT_URL; }
   function activeMetaUrl() { return GITHUB_META_URL || META_URL; }
+  // GitHub raw 有 CDN 缓存，加时间戳参数确保读到刚发布的版本（GitHub raw 对 query 变化会回源）
+  function withBust(url) { return url + (url.indexOf('?') >= 0 ? '&' : '?') + '_h=' + Date.now(); }
   // 从指定 URL 取 JSON；若启用了 GitHub 且首选地址失败，自动回退到内置地址（保证可用性）
-  async function fetchJson(url, fallbackUrl) {
+  // bust=true 时附加时间戳参数，用于「确认内容已变化后」拉取，避免拿到 CDN 缓存的旧内容
+  async function fetchJson(url, fallbackUrl, bust) {
     try {
-      const r = await fetch(url, { cache: 'no-store' });
+      const r = await fetch(bust ? withBust(url) : url, { cache: 'no-store' });
       if (r.ok) return await r.json();
     } catch (e) {}
     if (fallbackUrl) {
@@ -118,7 +121,7 @@
     }
     // 首次访问无缓存：必须等网络拉取，失败再用种子兜底
     try {
-      const data = await fetchJson(activeContentUrl(), GITHUB_CONTENT_URL ? CONTENT_URL : null);
+      const data = await fetchJson(activeContentUrl(), GITHUB_CONTENT_URL ? CONTENT_URL : null, true);
       if (data) {
         try { localStorage.setItem(CACHE_KEY, JSON.stringify(data)); } catch (e) {}
         try { localStorage.setItem(CACHE_HASH_KEY, await readHash()); } catch (e) {}
@@ -136,7 +139,7 @@
   //   （ETag 跨域读不到，但 Content-Length 属于 CORS 安全列表头部，前端可直接读取）
   // 两个信号任一变化即触发全量拉取，互为兜底，更稳妥。
   function readHash() {
-    const metaP = fetchJson(activeMetaUrl(), GITHUB_META_URL ? META_URL : null)
+    const metaP = fetchJson(activeMetaUrl(), GITHUB_META_URL ? META_URL : null, true)
       .then(function (m) { return (m && m.contentHash) || ''; })
       .catch(function () { return ''; });
     if (!GITHUB_CONTENT_URL) return metaP;
@@ -158,7 +161,7 @@
       try { oldHash = localStorage.getItem(CACHE_HASH_KEY) || ''; } catch (e) {}
       if (oldHash && oldHash === newHash) return; // 内容没变，省去整包下载
       // 内容变化（或首次比对）：绕过缓存拉取最新全量，比对后再决定是否重绘
-      fetchJson(activeContentUrl(), GITHUB_CONTENT_URL ? CONTENT_URL : null)
+      fetchJson(activeContentUrl(), GITHUB_CONTENT_URL ? CONTENT_URL : null, true)
         .then(function (fresh) {
           if (!fresh) return;
           let freshStr;

@@ -6,9 +6,83 @@
   // ===== 后台实时预览：每次保存草稿自动推送到预览 iframe（公开端效果所见即所得）=====
   let previewOpen = false;
   let previewReady = false;
-  // 包裹 saveDraft：任何后台保存（文章/设置/工具/链接）都会同步刷新预览
+  // 包裹 saveDraft：任何后台保存（文章/设置/工具/链接）都会同步刷新预览；
+  // 配置自动发布后静默推送到 GitHub。_skipAutoPub 供「仅存本机」等场景绕过发布。
+  let _skipAutoPub = false;
   const _origSaveDraft = CBStore.saveDraft;
-  CBStore.saveDraft = function (d) { _origSaveDraft(d); pushPreview(); };
+  CBStore.saveDraft = function (d) {
+    _origSaveDraft(d);
+    pushPreview();
+    if (_skipAutoPub) return;
+    if (ghAuto() && ghToken() && d) publishToGitHub(d, true).catch(function () {});
+  };
+  function saveLocalOnly(d) { _skipAutoPub = true; try { CBStore.saveDraft(d); } finally { _skipAutoPub = false; } }
+
+  // ===== 后台自动发布到 GitHub（改完即同步到所有设备）=====
+  // 令牌只存本机 localStorage，绝不上传到仓库 / 前端；仓库为公开只读数据源
+  const GH_OWNER = 'C-Abai';
+  const GH_REPO = 'AbaiDeNeiRongHeZi';
+  const GH_BRANCH = 'main';
+  const GH_PATH = 'content.json';
+  const GH_RAW = 'https://raw.githubusercontent.com/' + GH_OWNER + '/' + GH_REPO + '/refs/heads/' + GH_BRANCH + '/' + GH_PATH;
+  const GH_API = 'https://api.github.com/repos/' + GH_OWNER + '/' + GH_REPO + '/contents/' + GH_PATH;
+  const GH_META_API = 'https://api.github.com/repos/' + GH_OWNER + '/' + GH_REPO + '/contents/meta.json';
+  function ghToken() { try { return localStorage.getItem('cb_admin_gh_token') || ''; } catch (e) { return ''; } }
+  function ghAuto() { try { return localStorage.getItem('cb_admin_gh_autopub') === '1'; } catch (e) { return false; } }
+  function setGhToken(v) { try { v ? localStorage.setItem('cb_admin_gh_token', v) : localStorage.removeItem('cb_admin_gh_token'); } catch (e) {} }
+  function setGhAuto(v) { try { localStorage.setItem('cb_admin_gh_autopub', v ? '1' : '0'); } catch (e) {} }
+  let _publishing = false;
+  let _pendingData = null;
+  // 发布 content.json 后同步更新 GitHub 上 meta.json 的 contentHash。
+  // 公开端靠「指纹比对」决定是否重新拉取内容；只改 content.json 而不改指纹时，
+  // 内容字节数又恰好不变的话，其他设备会一直吃旧缓存、看不到新设置。
+  async function emitPublishSignal(tok) {
+    const headers = { 'Authorization': 'Bearer ' + tok, 'Accept': 'application/vnd.github+json' };
+    try {
+      const r = await fetch(GH_META_API + '?ref=' + GH_BRANCH + '&_h=' + Date.now(), { headers: headers, cache: 'no-store' });
+      if (!r.ok) return;
+      const mm = await r.json();
+      if (!mm || !mm.sha) return;
+      let obj = {};
+      try { obj = JSON.parse(decodeURIComponent(escape(atob((mm.content || '').replace(/\s/g, ''))))); } catch (e) { obj = {}; }
+      obj.contentHash = 'pub' + Date.now().toString(36);
+      const b64 = btoa(unescape(encodeURIComponent(JSON.stringify(obj, null, 2))));
+      await fetch(GH_META_API, {
+        method: 'PUT',
+        headers: Object.assign({}, headers, { 'Content-Type': 'application/json' }),
+        body: JSON.stringify({ message: 'publish: 更新内容指纹', content: b64, sha: mm.sha, branch: GH_BRANCH })
+      });
+    } catch (e) { /* 指纹更新失败不阻断内容发布 */ }
+  }
+
+  async function publishToGitHub(data, silent) {
+    const tok = ghToken();
+    if (!tok) { if (!silent) toast('未配置 GitHub 发布令牌'); return false; }
+    if (_publishing) { _pendingData = data; return false; } // 合并连续保存：最后一份一定会再发一次
+    _publishing = true;
+    try {
+      const head = await fetch(GH_API + '?ref=' + GH_BRANCH + '&_h=' + Date.now(), {
+        headers: { 'Authorization': 'Bearer ' + tok, 'Accept': 'application/vnd.github+json' }, cache: 'no-store'
+      });
+      if (!head.ok) { if (!silent) toast('获取文件信息失败：' + head.status); return false; }
+      const meta = await head.json();
+      const body = JSON.stringify(data, null, 2);
+      const b64 = btoa(unescape(encodeURIComponent(body)));
+      const put = await fetch(GH_API, {
+        method: 'PUT',
+        headers: { 'Authorization': 'Bearer ' + tok, 'Content-Type': 'application/json', 'Accept': 'application/vnd.github+json' },
+        body: JSON.stringify({ message: 'publish: 后台自动发布 content.json', content: b64, sha: meta.sha, branch: GH_BRANCH })
+      });
+      if (!put.ok) { const err = await put.json().catch(function () { return {}; }); if (!silent) toast('发布失败：' + put.status + ' ' + (err.message || '')); return false; }
+      await emitPublishSignal(tok);
+      if (!silent) toast('✅ 已发布到 GitHub，所有设备重开即同步');
+      return true;
+    } catch (e) { if (!silent) toast('发布异常：' + (e && e.message || e)); return false; }
+    finally {
+      _publishing = false;
+      if (_pendingData) { const d = _pendingData; _pendingData = null; publishToGitHub(d, true).catch(function () {}); }
+    }
+  }
 
   // 从 URL 取分享码，用于拉取线上最新内容时带上
   const SC = (function () { try { return new URLSearchParams(location.search).get('sharecode') || 'AK6QIELR67'; } catch (e) { return 'AK6QIELR67'; } })();
@@ -149,12 +223,19 @@
   }
 
   async   function enterAdmin() {
-    // 拉取线上最新内容（绕过缓存，确保后台看到的是刚发布的版本，而不是旧草稿）
+    // 拉取线上最新内容：优先读 GitHub 源（与前端同一份，确保「后台改完发布」后台自身也能看到），
+    // 失败再回退到托管平台 ./content.json
     let pub = null;
     try {
-      const r = await fetch('./content.json?sharecode=' + encodeURIComponent(SC) + '&pv=1', { cache: 'no-store' });
+      const r = await fetch(GH_RAW + '?t=' + Date.now(), { cache: 'no-store' });
       if (r.ok) pub = await r.json();
     } catch (e) { pub = null; }
+    if (!pub) {
+      try {
+        const r2 = await fetch('./content.json?sharecode=' + encodeURIComponent(SC) + '&pv=1', { cache: 'no-store' });
+        if (r2.ok) pub = await r2.json();
+      } catch (e) { pub = null; }
+    }
     const draft = CBStore.loadDraft();
     if (!pub) {
       // 离线或拉取失败：退而用草稿 / 缓存
@@ -1161,9 +1242,15 @@
 
   function renderPublish(panel) {
     panel.innerHTML = '<div class="admin-list"><div class="tool"><h3>📡 发布更新</h3>'
-      + '<p class="card-desc">本应用没有云端。更新内容的方式：在本机改好 → 导出 <b>content.json</b> → 让助手把它推上线（说一声「发布」即可）。别人重开 App（或自动更新）就会同步到新内容。</p>'
-      + '<div class="row"><button class="btn" id="p_export">导出 content.json</button><button class="btn ghost" id="p_copy">复制内容文本</button><button class="btn ghost" id="p_local">仅存本机草稿</button></div>'
-      + '<p class="help">本应用没有云端。更新内容的方式：在本机改好 → 点「复制内容文本」把内容发给我（说一声「发布」）→ 我推上线，别人重开 App 即同步。也可「导出 content.json」文件发我。</p>'
+      + '<p class="card-desc">推荐：在下方配置 GitHub 发布令牌后，后台任意「保存」都会自动发布，所有设备重开即同步。未配置令牌时，可导出 <b>content.json</b> 让助手帮忙推上线。</p>'
+      + '<div class="row"><button class="btn" id="p_export">导出 content.json</button><button class="btn ghost" id="p_copy">复制内容文本</button><button class="btn ghost" id="p_local">仅存本机草稿（不发布）</button><button class="btn ghost" id="gh_reload">🔄 从线上重新加载</button></div>'
+      + '<p class="help">「从线上重新加载」会用 GitHub 上的最新内容覆盖本机旧草稿，用于解决某台设备显示旧内容、或引导页设置变空的问题。</p>'
+      + '<div class="tool" style="margin-top:18px"><h3>🔑 GitHub 自动发布（改完即同步所有设备）</h3>'
+      + '<p class="card-desc">配置 GitHub 个人访问令牌（PAT，仅需 <b>repo</b> 权限）后，后台「保存」会即时把内容推送到 GitHub，所有设备重开即同步；也可点下方「立即发布当前内容」手动推送。令牌只存本机浏览器，<b>绝不上传仓库或前端</b>。</p>'
+      + '<div class="field"><label>GitHub 发布令牌 (PAT)</label><input type="password" id="gh_token" placeholder="ghp_xxx 或 github_pat_xxx" value="' + esc(ghToken()) + '"/><p class="help">生成位置：GitHub → 右上角头像 → Settings → Developer settings → Personal access tokens → Tokens (classic) → Generate new token，勾选 <b>repo</b> 权限。</p></div>'
+      + '<div class="checkbox-row"><input type="checkbox" id="gh_auto" ' + (ghAuto() ? 'checked' : '') + '/><label for="gh_auto">保存时自动发布到 GitHub（开启后任何后台保存都会即时同步）</label></div>'
+      + '<div class="row"><button class="btn" id="gh_save_cfg">保存令牌配置</button><button class="btn ghost" id="gh_publish_now">🚀 立即发布当前内容</button><button class="btn ghost" id="gh_clear">清除令牌</button></div>'
+      + '<p class="help" id="gh_status"></p></div>'
       + '<div class="sw-version-box"><h4>🔧 SW 缓存版本（Service Worker）</h4>'
       + '<p class="help">线上已发布版本：<b id="sw_online">读取中…</b>　|　本机运行版本：<b id="sw_running">读取中…</b></p>'
       + '<p class="help" id="sw_time">读取中…</p>'
@@ -1171,7 +1258,24 @@
       + '</div></div>';
     $('#p_export').onclick = function () { CBStore.exportContent(content); toast('已导出，发给助手发布'); };
     $('#p_copy').onclick = function () { if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(JSON.stringify(content, null, 2)); toast('已复制，发给助手即可发布'); };
-    $('#p_local').onclick = function () { CBStore.saveDraft(content); toast('已存本机'); };
+    $('#p_local').onclick = function () { saveLocalOnly(content); toast('已存本机草稿（未发布）'); };
+    const ghStatus = document.getElementById('gh_status');
+    $('#gh_reload').onclick = async function () {
+      if (ghStatus) ghStatus.textContent = '正在从 GitHub 拉取最新内容…';
+      try {
+        const r = await fetch(GH_RAW + '?t=' + Date.now(), { cache: 'no-store' });
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        const fresh = await r.json();
+        content = fresh;
+        saveLocalOnly(content);
+        applyAdminTheme();
+        renderPanel('publish');
+        toast('✅ 已同步线上最新内容（v' + versionOf(fresh) + '）');
+      } catch (e) { if (ghStatus) ghStatus.textContent = '❌ 拉取失败：' + (e && e.message || e); toast('拉取失败'); }
+    };
+    $('#gh_save_cfg').onclick = function () { setGhToken($('#gh_token').value.trim()); setGhAuto($('#gh_auto').checked); if (ghStatus) ghStatus.textContent = '已保存令牌配置（仅存本机）。' + (ghAuto() ? '已开启「保存即发布」。' : ''); toast('已保存令牌配置'); };
+    $('#gh_publish_now').onclick = async function () { if (ghStatus) ghStatus.textContent = '发布中…'; const ok = await publishToGitHub(content, false); if (ghStatus) ghStatus.textContent = ok ? '✅ 已发布，所有设备重开即同步。' : '❌ 发布失败，请检查令牌或网络。'; };
+    $('#gh_clear').onclick = function () { setGhToken(''); const tk = document.getElementById('gh_token'); if (tk) tk.value = ''; if (ghStatus) ghStatus.textContent = '已清除令牌。'; toast('已清除令牌'); };
     refreshSwVersion();
   }
 
