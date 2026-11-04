@@ -83,7 +83,13 @@
 
   <script>
     (function () {
-      // 数据源：与主应用共用 GitHub 上的 content.json（带 CORS，后台改了推上线即同步，无需重部署）
+      // 【v79】引导页数据源：同域优先（带门禁参数、国内快且稳），GitHub raw 仅作带超时的兜底。
+      // 旧版每次都硬拉 GitHub raw 的 1.28MB content.json 且没有超时，网络差时整页空等。
+      var SC = (function () {
+        try { return new URLSearchParams(location.search).get('sharecode') || 'AK6QIELR67'; }
+        catch (e) { return 'AK6QIELR67'; }
+      })();
+      var LOCAL = './content.json?sharecode=' + encodeURIComponent(SC);
       var RAW = 'https://raw.githubusercontent.com/C-Abai/AbaiDeNeiRongHeZi/refs/heads/main/content.json';
       var CACHE_KEY = 'cb_guide_cache_v1';
       var LEN_KEY = 'cb_guide_len_v1';
@@ -138,36 +144,46 @@
         };
       }
 
-      // 先用本地缓存即时渲染（消除白屏），再用 HEAD 取 Content-Length 作为变更信号，
-      // 仅当长度变化才重新拉取全量（避免每次都下载 1.1MB）。
+      // 先用本地缓存即时渲染（消除白屏），再用同域最新内容覆盖；
+      // 同域失败才退到 GitHub raw，两条链路都带超时，绝不无限等待。
       function renderCached() {
         try { var s = localStorage.getItem(CACHE_KEY); if (s) { render(JSON.parse(s)); return true; } } catch (e) {}
         return false;
       }
-      function headLen() {
-        return fetch(RAW + '?_h=' + Date.now(), { method: 'HEAD', cache: 'no-store' })
-          .then(function (r) { return r.ok ? (r.headers.get('Content-Length') || '') : ''; })
-          .catch(function () { return ''; });
+      function cacheIt(data) {
+        try {
+          var raw = JSON.stringify(data);
+          localStorage.setItem(CACHE_KEY, raw);
+          try { localStorage.setItem(LEN_KEY, String(raw.length)); } catch (e) {}
+        } catch (e) {}
       }
-      function loadFull() {
-        return fetch(RAW + '?_h=' + Date.now(), { cache: 'no-store' })
-          .then(function (r) { return r.ok ? r.json() : Promise.reject(); });
+      function fetchT(url, opts, ms) {
+        return new Promise(function (resolve, reject) {
+          var ctl = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+          var timer = setTimeout(function () { if (ctl) ctl.abort(); reject(new Error('timeout')); }, ms);
+          var o = Object.assign({}, opts || {});
+          if (ctl) o.signal = ctl.signal;
+          fetch(url, o).then(function (r) { clearTimeout(timer); resolve(r); },
+                             function (e) { clearTimeout(timer); reject(e); });
+        });
+      }
+      function loadJson(url, ms) {
+        return fetchT(url + (url.indexOf('?') >= 0 ? '&' : '?') + '_h=' + Date.now(),
+                      { cache: 'no-store' }, ms)
+          .then(function (r) { return r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)); });
       }
       function init() {
-        // 实时优先：先用本地缓存秒开（若有），随后每次都向 GitHub 取最新并覆盖渲染，
-        // 避免「靠 Content-Length 判断跳过拉取」导致的旧配置残留（如引导页启用状态不更新）。
         var hadCache = renderCached();
-        loadFull()
+        loadJson(LOCAL, 6000)
           .then(function (data) {
-            try {
-              var raw = JSON.stringify(data);
-              localStorage.setItem(CACHE_KEY, raw);
-              try { localStorage.setItem(LEN_KEY, String(raw.length)); } catch (e) {}
-            } catch (e) {}
+            if (!data || !data.config) return Promise.reject(new Error('bad payload'));
+            cacheIt(data);
             render(data);
           })
           .catch(function () {
-            if (!hadCache) showEmpty();
+            loadJson(RAW, 2500)
+              .then(function (data) { cacheIt(data); render(data); })
+              .catch(function () { if (!hadCache) showEmpty(); });
           });
       }
       init();

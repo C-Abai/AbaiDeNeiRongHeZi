@@ -1,37 +1,56 @@
 (function (global) {
-  // 数据层：content.json 为线上单一数据源（网络优先，本地缓存兜底）
-  // 后台编辑存本机草稿(localStorage)，发布时由助手把 content.json 推上线
-  const CONTENT_URL = './content.json';
-  const META_URL = './meta.json';
+  // 数据层：同域 content.json 为权威数据源（国内快且稳），GitHub raw 仅作异步补充校验。
+  // 【v79 关键修复】托管平台所有静态资源必须带 sharecode 门禁参数，否则返回「链接不完整」HTML，
+  // 旧版 './content.json' / './meta.json' 不带门禁 → 所有同域兜底请求其实都拿到 HTML 而静默失败。
+  const SC = (function () {
+    try { return new URLSearchParams(location.search).get('sharecode') || 'AK6QIELR67'; }
+    catch (e) { return 'AK6QIELR67'; }
+  })();
+  function gate(u) { return u + (u.indexOf('?') >= 0 ? '&' : '?') + 'sharecode=' + encodeURIComponent(SC); }
+  const CONTENT_URL = gate('./content.json');
+  const META_URL = gate('./meta.json');
   const CACHE_KEY = 'cb_content_cache_v1';
   const CACHE_HASH_KEY = 'cb_content_hash_v1';
   const DRAFT_KEY = 'cb_admin_draft_v1';
 
-  // ===== 方案 A（可选内容源）：填了 GitHub raw 地址就从 GitHub 拉内容，拉不到自动回退到内置 content.json =====
-  // 留空 '' = 不启用，维持原 WorkBuddy 内置内容行为（默认）。
-  // 启用方式：把下面两个填成你的仓库 raw 地址（内容更新只需在 GitHub 网页改 content.json 提交即可，无需重新部署）。
-  // 回退机制：即便 GitHub 仓库被删/搞乱，App 仍会回退到内置内容照常运行——这就是「备份兜底」之外的第二道保险。
   const GITHUB_CONTENT_URL = 'https://raw.githubusercontent.com/C-Abai/AbaiDeNeiRongHeZi/refs/heads/main/content.json';
   const GITHUB_META_URL = 'https://raw.githubusercontent.com/C-Abai/AbaiDeNeiRongHeZi/refs/heads/main/meta.json';
-  function activeContentUrl() { return GITHUB_CONTENT_URL || CONTENT_URL; }
-  function activeMetaUrl() { return GITHUB_META_URL || META_URL; }
-  // GitHub raw 有 CDN 缓存，加时间戳参数确保读到刚发布的版本（GitHub raw 对 query 变化会回源）
+  const LOCAL_MS = 6000;   // 同域请求超时上限（仅兜底，正常网络毫秒级返回）
+  const REMOTE_MS = 2500;  // GitHub raw 跨境超时（快速失败，绝不允许拖住首屏 / 登录）
+
   function withBust(url) { return url + (url.indexOf('?') >= 0 ? '&' : '?') + '_h=' + Date.now(); }
-  // 从指定 URL 取 JSON；若启用了 GitHub 且首选地址失败，自动回退到内置地址（保证可用性）
-  // bust=true 时附加时间戳参数，用于「确认内容已变化后」拉取，避免拿到 CDN 缓存的旧内容
-  async function fetchJson(url, fallbackUrl, bust) {
-    try {
-      const r = await fetch(bust ? withBust(url) : url, { cache: 'no-store' });
-      if (r.ok) return await r.json();
-    } catch (e) {}
-    if (fallbackUrl) {
-      try {
-        const r = await fetch(fallbackUrl, { cache: 'reload' });
-        if (r.ok) return await r.json();
-      } catch (e) {}
-    }
-    return null;
+
+  // 【v79 核心】所有网络请求统一带超时。旧版对 GitHub raw 的 HEAD 请求无超时，
+  // 国内网络挂起时 Promise.all 永不完成 → 指纹检测卡死 → localStorage 里 v66 老内容永远不更新，
+  // 只能靠反复刷新碰运气。现在任何请求最多等 LOCAL_MS / REMOTE_MS 毫秒。
+  function fetchT(url, opts, ms) {
+    return new Promise(function (resolve, reject) {
+      const ctl = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+      const timer = setTimeout(function () { if (ctl) ctl.abort(); reject(new Error('timeout')); }, ms);
+      const o = Object.assign({}, opts || {});
+      if (ctl) o.signal = ctl.signal;
+      fetch(url, o).then(function (r) { clearTimeout(timer); resolve(r); },
+                         function (e) { clearTimeout(timer); reject(e); });
+    });
   }
+  async function fetchJsonT(url, ms) {
+    const r = await fetchT(withBust(url), { cache: 'no-store' }, ms);
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const d = await r.json();
+    // 门禁失败会返回「链接不完整」HTML，r.json() 会抛错；这里再挡一层非对象响应
+    if (!d || typeof d !== 'object' || !d.config) throw new Error('bad payload');
+    return d;
+  }
+
+  // meta.json 是 {contentHash, sw}，没有 config 字段，不能走带内容校验的 fetchJsonT
+  async function fetchMetaT(url, ms) {
+    const r = await fetchT(withBust(url), { cache: 'no-store' }, ms);
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    return await r.json();
+  }
+
+  function cacheSet(d) { try { localStorage.setItem(CACHE_KEY, JSON.stringify(d)); } catch (e) {} }
+  function cacheStr() { try { return localStorage.getItem(CACHE_KEY) || ''; } catch (e) { return ''; } }
 
   function seed() {
     return {
@@ -107,72 +126,57 @@
     } catch (e) { return null; }
   }
 
-  // 公开端：缓存优先即时返回（首屏不再等网络），再后台静默比对「内容指纹」(meta.json)，
-  // 仅当内容真正变化时才去拉取 655KB 的 content.json（cache:'reload' 绕过缓存拿最新），
-  // 否则完全不下载，极大节省手机流量与加载耗时。
+  // 公开端：有缓存立即返回（首屏零等待、不白屏），同时【每次启动都强制】向同域取一次最新内容，
+  // 拿到即比对、写入缓存并回调重绘。不再依赖「指纹比对成功才更新」——旧版指纹链路被
+  // GitHub raw 的无超时 HEAD 请求卡死，内容永远停在 v66，只能反复刷新碰运气。
   async function fetchContent(opts) {
     opts = opts || {};
-    const cachedStr = (function () { try { return localStorage.getItem(CACHE_KEY); } catch (e) { return null; } })();
-    const cached = cachedStr ? safeParse(cachedStr) : null;
-    if (cached) {
-      // 立即返回缓存用于首屏渲染；随后用极小的 meta.json 比对指纹，有变化才拉全量内容
-      checkContentUpdate(opts);
-      return cached;
-    }
-    // 首次访问无缓存：必须等网络拉取，失败再用种子兜底
-    try {
-      const data = await fetchJson(activeContentUrl(), GITHUB_CONTENT_URL ? CONTENT_URL : null, true);
-      if (data) {
-        try { localStorage.setItem(CACHE_KEY, JSON.stringify(data)); } catch (e) {}
-        try { localStorage.setItem(CACHE_HASH_KEY, await readHash()); } catch (e) {}
-        return data;
-      }
-    } catch (e) { /* 离线或 file:// 直接走兜底 */ }
-    try { const c = localStorage.getItem(CACHE_KEY); if (c) return JSON.parse(c); } catch (e) {}
+    const cached = getCached();
+    // 后台并行刷新，不阻塞首屏；两条链路都带超时，绝不挂死
+    refreshFromLocal(opts);
+    crossCheckGithub(opts);
+    if (cached) return cached;
+    // 首次访问无缓存：等同域（4s 超时）→ GitHub raw（2.5s 超时）→ 种子内容
+    try { const d = await fetchJsonT(CONTENT_URL, 8000); cacheSet(d); return d; } catch (e) {}
+    try { const d = await fetchJsonT(GITHUB_CONTENT_URL, REMOTE_MS); cacheSet(d); return d; } catch (e) {}
     return seed();
   }
 
-  // 读取线上「内容变更信号」：
-  // - 本地/内置模式：读极小的 meta.json 指纹
-  // - GitHub 模式：额外用 HEAD 请求取 Content-Length（只下载几百字节的响应头，不下内容），
-  //   这样改完 content.json 直接覆盖上传即可，无需再手工维护 meta.json 里的哈希。
-  //   （ETag 跨域读不到，但 Content-Length 属于 CORS 安全列表头部，前端可直接读取）
-  // 两个信号任一变化即触发全量拉取，互为兜底，更稳妥。
-  function readHash() {
-    const metaP = fetchJson(activeMetaUrl(), GITHUB_META_URL ? META_URL : null, true)
-      .then(function (m) { return (m && m.contentHash) || ''; })
-      .catch(function () { return ''; });
-    if (!GITHUB_CONTENT_URL) return metaP;
-    const sizeP = fetch(GITHUB_CONTENT_URL + (GITHUB_CONTENT_URL.indexOf('?') >= 0 ? '&' : '?') + '_h=' + Date.now(), {
-      method: 'HEAD', cache: 'no-store'
-    })
-      .then(function (r) { return r.ok ? (r.headers.get('Content-Length') || '') : ''; })
-      .catch(function () { return ''; });
-    return Promise.all([metaP, sizeP]).then(function (a) {
-      return (a[0] || '') + '|len:' + (a[1] || '');
-    });
+  // 内容确有变化才写缓存 + 重绘，避免无谓的界面抖动
+  function applyFresh(fresh, opts) {
+    if (!fresh) return;
+    let s;
+    try { s = JSON.stringify(fresh); } catch (e) { return; }
+    if (s === cacheStr()) return;
+    cacheSet(fresh);
+    try { localStorage.setItem(CACHE_HASH_KEY, 'v79-' + s.length); } catch (e) {}
+    if (opts && opts.onUpdate) opts.onUpdate(fresh);
   }
 
-  // 后台静默比对：指纹未变 → 直接跳过（不下载 655KB）；指纹变了 → 拉全量并回调 onUpdate
-  function checkContentUpdate(opts) {
-    readHash().then(function (newHash) {
-      if (!newHash) return;
-      let oldHash = '';
-      try { oldHash = localStorage.getItem(CACHE_HASH_KEY) || ''; } catch (e) {}
-      if (oldHash && oldHash === newHash) return; // 内容没变，省去整包下载
-      // 内容变化（或首次比对）：绕过缓存拉取最新全量，比对后再决定是否重绘
-      fetchJson(activeContentUrl(), GITHUB_CONTENT_URL ? CONTENT_URL : null, true)
-        .then(function (fresh) {
-          if (!fresh) return;
-          let freshStr;
-          try { freshStr = JSON.stringify(fresh); } catch (e) { return; }
-          if (freshStr !== (function () { try { return localStorage.getItem(CACHE_KEY); } catch (e) { return ''; } })()) {
-            try { localStorage.setItem(CACHE_KEY, freshStr); } catch (e) {}
-            try { localStorage.setItem(CACHE_HASH_KEY, newHash); } catch (e) {}
-            if (opts.onUpdate) opts.onUpdate(fresh);
-          }
-        })
-        .catch(function () {});
+  // 同域权威刷新：每次打开必拉一次；同域失败才退到 GitHub raw（同样带超时）
+  function refreshFromLocal(opts) {
+    fetchJsonT(CONTENT_URL, LOCAL_MS)
+      .then(function (fresh) { applyFresh(fresh, opts); })
+      .catch(function () {
+        fetchJsonT(GITHUB_CONTENT_URL, REMOTE_MS)
+          .then(function (fresh) { applyFresh(fresh, opts); })
+          .catch(function () {});
+      });
+  }
+
+  // 纯异步补充：若用户/后台只改了 GitHub（托管端尚未重新部署），用 meta.json 指纹差异纠正。
+  // 不参与首屏等待；GitHub 不可达时静默忽略，同域内容照常可用。
+  function crossCheckGithub(opts) {
+    Promise.all([
+      fetchMetaT(GITHUB_META_URL, REMOTE_MS).catch(function () { return null; }),
+      fetchMetaT(META_URL, 1500).catch(function () { return null; })
+    ]).then(function (a) {
+      const gh = a[0] && a[0].contentHash;
+      const lo = a[1] && a[1].contentHash;
+      if (!gh || !lo || gh === lo) return null;   // 两端一致或读不到，不浪费流量
+      return fetchJsonT(GITHUB_CONTENT_URL, 3000);
+    }).then(function (fresh) {
+      if (fresh) applyFresh(fresh, opts);
     }).catch(function () {});
   }
 

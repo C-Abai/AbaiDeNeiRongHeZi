@@ -212,7 +212,7 @@
       });
       // 注册 URL 带 &v= 版本号：每次部署脚本地址都不同，浏览器必须重新下载 SW，
       // 不再依赖对 sw.js 的 HTTP 缓存复用，从而「一次刷新就生效」，杜绝反复刷新才更新的卡顿。
-      navigator.serviceWorker.register('sw.js?sharecode=AK6QIELR67&v=78').then(function (reg) {
+      navigator.serviceWorker.register('sw.js?sharecode=AK6QIELR67&v=79').then(function (reg) {
         if (!reg) return;
         // 主动触发一次更新检查（register 本身也会检查，这里再兜一层，缩短检测时延）
         if (reg.update) { try { reg.update(); } catch (e) {} }
@@ -801,7 +801,20 @@
         // 不能让 beforeinstallprompt 抢先触发 PWA 安装，否则点「一键安装」不会跳引导页。
         if (isWx) { toast('请点右上角 ··· 在浏览器中打开本页后再下载'); return; }
         if (isIOS) { showAddHomeGuide(); return; }
-        if (apkUrl) { location.href = apkUrl; return; }
+        // 【v79】跳引导页时直接「替换」当前内容界面（location.replace），不再把内容页
+        // 留在历史栈里，按返回键回不到内容界面；已装到桌面的 PWA 则用系统浏览器新开
+        // 独立下载页，避免引导页被套在内容 App 的界面里显示。
+        if (apkUrl) {
+          const standalone = (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches)
+            || window.navigator.standalone === true;
+          if (standalone) {
+            const w = window.open(apkUrl, '_blank');
+            if (!w) location.replace(apkUrl);   // 弹窗被拦截时兜底
+          } else {
+            location.replace(apkUrl);
+          }
+          return;
+        }
         if (window.__installPrompt) { installNow(); return; }
         toast('请用浏览器菜单「安装 / 添加到主屏幕」');
       });

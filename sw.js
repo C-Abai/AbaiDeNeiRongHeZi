@@ -1,4 +1,4 @@
-const CACHE = 'contentbox-v78';
+const CACHE = 'contentbox-v79';
 const SC = 'AK6QIELR67';
 const ASSETS = [
   './index.html?sharecode=' + SC,
@@ -111,31 +111,31 @@ self.addEventListener('fetch', (event) => {
     event.respondWith(fetch(req));
     return;
   }
-  // 导航请求（HTML 文档）：网络优先，确保每次扫码 / 打开都是最新页面
-  // 根治「部署后第一次打开仍是旧版」——旧 SW 先吐旧缓存、新版要等下次刷新的竞态。
-  if (req.mode === 'navigate') {
+  // 【v79】引导页：独立下载页，永远走网络、绝不进 SW 缓存。
+  // 旧版导航统一 netFirst 会把 guide.html 写进壳缓存，容易与主应用界面串味；
+  // 现在它完全不受 SW 接管，打开就是一张干净的下载卡片，也回不到内容界面。
+  if (url.indexOf('guide.html') > -1) {
+    event.respondWith(fetch(req));
+    return;
+  }
+  // 【v79】数据请求（同域 + 跨域 GitHub raw）全部放行，由页面自己的 no-store + 超时控制。
+  // SW 绝不缓存 content.json / meta.json：旧版会缓存「链接不完整」HTML 和带时间戳的
+  // raw 副本，造成老内容残留、缓存膨胀，也是「刷新好多遍才是新内容」的帮凶。
+  if (url.indexOf('content.json') > -1 || url.indexOf('meta.json') > -1) {
+    event.respondWith(fetch(req));
+    return;
+  }
+  // 导航请求（HTML 文档）与后台页：网络优先，确保每次扫码 / 打开都是最新页面
+  if (req.mode === 'navigate' || url.indexOf('admin.html') > -1) {
     event.respondWith(netFirst(event));
     return;
   }
-  // 后台管理页：网络优先（离线回退缓存），发布后打开即最新
-  if (url.indexOf('admin.html') > -1) {
-    event.respondWith(netFirst(event));
-    return;
-  }
-  // 内容指纹 meta.json：必须走网络拿最新（极小文件），公开端据此判断要不要拉全量
-  if (url.indexOf('meta.json') > -1) {
-    event.respondWith(netFirst(event));
-    return;
-  }
-  // 内容数据：缓存优先即时返回（秒开），后台静默刷新；应用层指纹未变则不真正下载
-  if (url.indexOf('content.json') > -1) {
-    event.respondWith(staleWhileRevalidate(event));
-    return;
-  }
-  // 应用外壳（js/css/icon/manifest）：网络优先，保证发布后立即生效（离线回退缓存）
-  // 原「缓存优先」会在部署后第一次打开时先吐旧壳，导致扫码/跳转看到旧版，故改为网络优先。
+  // 【v79】应用外壳（js/css/icon/manifest）：缓存优先 + 后台静默更新，首屏秒开。
+  // 新版本 SW install 时已用 cache:'reload' 预缓存全部新壳，配合 app.js 的
+  // controllerchange 自动 reload，部署后一次刷新即生效，不会残留旧壳。
+  // 旧版这里走网络优先，每次打开都要重下全部 js/css，是「网页端延迟大」的主因之一。
   if (isShellUrl(url)) {
-    event.respondWith(netFirst(event));
+    event.respondWith(staleWhileRevalidate(event));
     return;
   }
   // 其他静态资源：缓存优先，离线可用

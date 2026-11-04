@@ -39,7 +39,7 @@
   async function emitPublishSignal(tok) {
     const headers = { 'Authorization': 'Bearer ' + tok, 'Accept': 'application/vnd.github+json' };
     try {
-      const r = await fetch(GH_META_API + '?ref=' + GH_BRANCH + '&_h=' + Date.now(), { headers: headers, cache: 'no-store' });
+      const r = await fetchWithTimeout(GH_META_API + '?ref=' + GH_BRANCH + '&_h=' + Date.now(), { headers: headers, cache: 'no-store' }, 5000);
       if (!r.ok) return;
       const mm = await r.json();
       if (!mm || !mm.sha) return;
@@ -47,11 +47,11 @@
       try { obj = JSON.parse(decodeURIComponent(escape(atob((mm.content || '').replace(/\s/g, ''))))); } catch (e) { obj = {}; }
       obj.contentHash = 'pub' + Date.now().toString(36);
       const b64 = btoa(unescape(encodeURIComponent(JSON.stringify(obj, null, 2))));
-      await fetch(GH_META_API, {
+      await fetchWithTimeout(GH_META_API, {
         method: 'PUT',
         headers: Object.assign({}, headers, { 'Content-Type': 'application/json' }),
         body: JSON.stringify({ message: 'publish: 更新内容指纹', content: b64, sha: mm.sha, branch: GH_BRANCH })
-      });
+      }, 6000);
     } catch (e) { /* 指纹更新失败不阻断内容发布 */ }
   }
 
@@ -61,18 +61,18 @@
     if (_publishing) { _pendingData = data; return false; } // 合并连续保存：最后一份一定会再发一次
     _publishing = true;
     try {
-      const head = await fetch(GH_API + '?ref=' + GH_BRANCH + '&_h=' + Date.now(), {
+      const head = await fetchWithTimeout(GH_API + '?ref=' + GH_BRANCH + '&_h=' + Date.now(), {
         headers: { 'Authorization': 'Bearer ' + tok, 'Accept': 'application/vnd.github+json' }, cache: 'no-store'
-      });
+      }, 6000);
       if (!head.ok) { if (!silent) toast('获取文件信息失败：' + head.status); return false; }
       const meta = await head.json();
       const body = JSON.stringify(data, null, 2);
       const b64 = btoa(unescape(encodeURIComponent(body)));
-      const put = await fetch(GH_API, {
+      const put = await fetchWithTimeout(GH_API, {
         method: 'PUT',
         headers: { 'Authorization': 'Bearer ' + tok, 'Content-Type': 'application/json', 'Accept': 'application/vnd.github+json' },
         body: JSON.stringify({ message: 'publish: 后台自动发布 content.json', content: b64, sha: meta.sha, branch: GH_BRANCH })
-      });
+      }, 8000);
       if (!put.ok) { const err = await put.json().catch(function () { return {}; }); if (!silent) toast('发布失败：' + put.status + ' ' + (err.message || '')); return false; }
       await emitPublishSignal(tok);
       if (!silent) toast('✅ 已发布到 GitHub，所有设备重开即同步');
@@ -242,53 +242,57 @@
     };
   }
 
-  async   function enterAdmin() {
-    // 同域优先（部署时已与 GitHub 同步，毫秒级返回）。GitHub raw 跨境实测可达 20s+，
-    // 因此只作为「线上版本更新」的可选校验并加 6s 超时，绝不让后台登录干等。
-    let pub = null;
-    try {
-      const r = await fetch('./content.json?sharecode=' + encodeURIComponent(SC) + '&pv=1', { cache: 'no-store' });
-      if (r.ok) pub = await r.json();
-    } catch (e) { pub = null; }
-    try {
-      const gh = await fetchWithTimeout(GH_RAW + '?t=' + Date.now(), { cache: 'no-store' }, 6000);
-      if (gh.ok) {
-        const g = await gh.json();
-        if ((parseInt(versionOf(g), 10) || 0) > (parseInt(versionOf(pub), 10) || 0)) pub = g;
-      }
-    } catch (e) { /* 超时或失败：沿用同域版，不影响进入后台 */ }
-    const draft = CBStore.loadDraft();
-    if (!pub) {
-      content = draft || (await CBStore.fetchContent());
-      if (content) saveLocalOnly(content);
-    } else if (!draft) {
-      content = pub;
-      saveLocalOnly(content);
-    } else {
-      const pubTs = (pub.deployMeta && pub.deployMeta.ts) || '';
-      const dftTs = (draft.deployMeta && draft.deployMeta.ts) || '';
-      const gPub = (pub.config && pub.config.guide) || {};
-      const gDft = (draft.config && draft.config.guide) || {};
-      // 草稿明显陈旧（引导页被清空/未启用、或缺 apkUrl）时以线上已发布版为权威，
-      // 修掉「换个窗口/手机进后台，引导页设置变空、一键安装丢失」的老问题
-      const draftStale = (!gDft.enabled && !!gPub.enabled) || !(draft.config && draft.config.apkUrl);
-      if (draftStale || (dftTs && pubTs && dftTs < pubTs)) {
-        content = rebaseDraft(pub, draft);
-        toast('已同步线上最新设置（v' + versionOf(pub) + '）');
-      } else {
-        content = draft;
-      }
-      saveLocalOnly(content); // 进入后台本身绝不触发自动发布，避免旧草稿写回仓库
-    }
+  function prepareContent() {
     if (!content.config) content.config = {};
     // 引导页默认值：关闭状态，内容留空（用户在后台「引导页」编辑并发布后再启用）
     if (!content.config.guide) content.config.guide = { enabled: false, title: '', subtitle: '', intro: '', apkUrl: '', buttonText: '立即下载安装', icon: '' };
-    // 兜底：未填安装链接时默认指向引导页（普通网页），避免一键安装变成直接下载 .apk
+    // 兜底：未填安装链接时默认指向引导页，避免一键安装变成直接下载 .apk
     if (!content.config.apkUrl) content.config.apkUrl = DEFAULT_INSTALL_URL;
-    // 后台界面：按本机「暗调开关」决定自身是否转暗调（默认浅色）；暗调套用后台调好的暗调参数
     document.body.classList.toggle('admin-dark', getAdminDim());
     applyAdminTheme();
+  }
+
+  // 线上已发布内容 vs 本机草稿：草稿明显陈旧时以线上为权威打底，仅补回本机独有新增项
+  function resolveContent(pub, draft) {
+    if (!draft) return pub;
+    const pubTs = (pub.deployMeta && pub.deployMeta.ts) || '';
+    const dftTs = (draft.deployMeta && draft.deployMeta.ts) || '';
+    const gPub = (pub.config && pub.config.guide) || {};
+    const gDft = (draft.config && draft.config.guide) || {};
+    const draftStale = (!gDft.enabled && !!gPub.enabled) || !(draft.config && draft.config.apkUrl);
+    if (draftStale || (dftTs && pubTs && dftTs < pubTs)) return rebaseDraft(pub, draft);
+    return draft;
+  }
+
+  async function enterAdmin() {
+    // 【v79 登录零等待】旧版每次登录都无条件请求 GitHub raw 并等满 6 秒超时，
+    // 这是「输入密码后转圈很久」的唯一原因。现在先用本机草稿/缓存立即把后台画出来（0ms），
+    // 再后台静默用同域 content.json（带门禁 + 3s 超时）校正，全程不阻塞操作。
+    const draft = CBStore.loadDraft();
+    content = draft || CBStore.getCached() || CBStore.seed();
+    prepareContent();
     renderShell();
+
+    try {
+      const r = await fetchWithTimeout(
+        './content.json?sharecode=' + encodeURIComponent(SC) + '&pv=1&_h=' + Date.now(),
+        { cache: 'no-store' }, 6000);
+      if (!r.ok) return;
+      const pub = await r.json();
+      if (!pub || !pub.config) return;
+      const next = resolveContent(pub, draft);
+      if (JSON.stringify(next) === JSON.stringify(content)) return;
+      const activeTab = document.querySelector('.admin-tabs .tab.active');
+      const tabKey = (activeTab && activeTab.dataset.t) || 'posts';
+      content = next;
+      prepareContent();
+      saveLocalOnly(content);  // 进入/校正后台绝不触发自动发布，避免旧草稿写回仓库
+      // 只重绘当前面板，不重建 shell（避免重复绑定事件）；用户正在输入时不打断
+      const ae = document.activeElement;
+      const editing = ae && ae !== document.body && /INPUT|TEXTAREA|SELECT/.test(ae.tagName || '');
+      if (!editing) renderPanel(tabKey);
+      toast('已同步线上最新内容');
+    } catch (e) { /* 超时 / 离线：沿用本机数据，不影响使用 */ }
   }
 
   function renderShell() {
@@ -1287,7 +1291,8 @@
     $('#gh_reload').onclick = async function () {
       if (ghStatus) ghStatus.textContent = '正在从 GitHub 拉取最新内容…';
       try {
-        const r = await fetch(GH_RAW + '?t=' + Date.now(), { cache: 'no-store' });
+        // 手动重载也带超时：GitHub raw 跨境不可达时 5 秒内给明确反馈，不无限转圈
+        const r = await fetchWithTimeout(GH_RAW + '?t=' + Date.now(), { cache: 'no-store' }, 5000);
         if (!r.ok) throw new Error('HTTP ' + r.status);
         const fresh = await r.json();
         content = fresh;
