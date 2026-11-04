@@ -645,18 +645,127 @@
 
   function renderGuide(panel) {
     const g = (content.config && content.config.guide) || {};
+    const guideUrl = location.origin + '/guide.html?sharecode=AK6QIELR67';
     panel.innerHTML = '<div class="admin-list">'
       + '<div class="sub">📥 引导下载页（独立网页 <code>guide.html</code>，用于引导用户下载安装 APK）</div>'
+      + '<div class="guide-preview-box"><div class="gpb-lbl">📱 实时预览（根据下方设置即时更新，预览内按钮不会真正跳转 / 下载）</div>'
+      + '<div class="gpb-frame"><iframe id="g_preview" class="gpb-iframe" title="引导页预览"></iframe></div></div>'
       + '<div class="checkbox-row"><input type="checkbox" id="g_enabled" ' + (g.enabled ? 'checked' : '') + '/><label for="g_enabled">启用引导页（关闭时访问引导页显示「未配置」占位）</label></div>'
       + '<div class="field"><label>页面标题</label><input type="text" id="g_title" value="' + esc(g.title || '') + '" placeholder="如：内容盒子"/></div>'
       + '<div class="field"><label>副标题 / 应用名</label><input type="text" id="g_subtitle" value="' + esc(g.subtitle || '') + '" placeholder="如：你的随身内容工具"/></div>'
       + '<div class="field"><label>内容介绍（支持换行）</label><textarea id="g_intro" class="auth-textarea">' + esc(g.intro || '') + '</textarea></div>'
       + '<div class="field"><label>APK 直装链接（留空则使用「站点设置」里的 APK 链接）</label><input type="text" id="g_apk" value="' + esc(g.apkUrl || '') + '" placeholder="https://.../app.apk?sharecode=..."/></div>'
       + '<div class="field"><label>安装按钮文字</label><input type="text" id="g_btn" value="' + esc(g.buttonText || '立即下载安装') + '"/></div>'
-      + '<div class="field"><label>图标 / Logo 图片地址（留空则使用站点图标）</label><input type="text" id="g_icon" value="' + esc(g.icon || '') + '" placeholder="https://.../icon.png"/></div>'
+      + '<div class="field"><label>图标 / Logo（上传图片，自动居中裁剪为 256×256 方形图标）</label>'
+      + '<div class="icon-upload"><div class="icon-prev" id="g_icon_prev">' + (g.icon ? '<img src="' + esc(g.icon) + '" alt="icon"/>' : '<span class="ph">预览</span>') + '</div>'
+      + '<div class="icon-actions"><input type="file" id="g_icon_file" accept="image/*" style="display:none">'
+      + '<button type="button" class="btn ghost" id="g_icon_pick">选择图片</button>'
+      + (g.icon ? '<button type="button" class="btn ghost" id="g_icon_del">移除</button>' : '') + '</div></div>'
+      + '<p class="help">支持横屏 / 竖屏 / 长图，上传后自动缩放并居中裁剪为 256×256 方形图标，无需手动处理尺寸。</p></div>'
       + '<div class="row" style="margin-top:14px"><button class="btn" id="g_save">保存引导页设置</button>'
       + '<a class="btn ghost" id="g_open" href="guide.html?sharecode=AK6QIELR67" target="_blank" rel="noopener">👁 打开引导页</a></div>'
-      + '<p class="help">引导页访问地址：<code>guide.html?sharecode=AK6QIELR67</code>。可把该链接发给用户，或在「站点设置 → APK 直装链接」里指向它，作为统一下载入口。</p></div>';
+      + '<div class="guide-url-box"><div class="gub-lbl">引导页独立地址（可直接发送给用户）</div>'
+      + '<div class="gub-row"><input class="gub-input" id="g_url" type="text" readonly value="' + esc(guideUrl) + '">'
+      + '<button type="button" class="btn ghost" id="g_url_cp">复制</button></div>'
+      + '<p class="help">该地址即引导页独立链接，可在「站点设置 → APK 直装链接」里指向它作为统一下载入口。</p></div>';
+
+    var currentIcon = g.icon || '';
+    var pickBtn = $('#g_icon_pick');
+    var fileInput = $('#g_icon_file');
+    var prev = $('#g_icon_prev');
+    if (pickBtn && fileInput) {
+      pickBtn.onclick = function () { fileInput.click(); };
+      fileInput.onchange = function () {
+        var f = fileInput.files && fileInput.files[0];
+        if (!f) return;
+        resizeImageToSquare(f, 256, function (dataUrl) {
+          currentIcon = dataUrl;
+          if (prev) prev.innerHTML = '<img src="' + dataUrl + '" alt="icon"/>';
+          updatePreview();
+          toast('图标已裁剪，保存后生效');
+        }, function (err) { toast('图片处理失败：' + err); });
+      };
+    }
+    var delBtn = $('#g_icon_del');
+    if (delBtn) delBtn.onclick = function () { currentIcon = ''; if (prev) prev.innerHTML = '<span class="ph">预览</span>'; if (fileInput) fileInput.value = ''; updatePreview(); };
+
+    var urlCp = $('#g_url_cp');
+    if (urlCp) urlCp.onclick = function () {
+      var inp = $('#g_url');
+      var doCopy = function (text) {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(text).then(function () { toast('地址已复制'); }, function () { toast('复制失败，请手动复制'); });
+        } else { toast('当前环境不支持复制'); }
+      };
+      if (inp) { inp.focus(); inp.select(); doCopy(inp.value); }
+    };
+
+    // ---- 引导页实时预览：用 iframe 加载一份与 guide.html 同源渲染，注入当前表单值 ----
+    var GUIDE_CSS = ':root{--g-primary:#07c160;--g-primary-d:#06a653;--g-bg:#f2f5f8;--g-card:#fff;--g-text:#1f2329;--g-sub:#8a9099}'
+      + '*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}html,body{margin:0;padding:0}'
+      + 'body{font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei","Helvetica Neue",Arial,sans-serif;'
+      + 'background:linear-gradient(160deg,#e9f7ef 0%,var(--g-bg) 45%);color:var(--g-text);min-height:100vh;'
+      + 'display:flex;align-items:center;justify-content:center;padding:24px 16px}'
+      + '.guide-wrap{width:100%;max-width:420px}.guide-card{background:var(--g-card);border-radius:22px;padding:34px 24px 28px;'
+      + 'text-align:center;box-shadow:0 12px 40px rgba(7,193,96,.12)}'
+      + '.g-icon{width:96px;height:96px;border-radius:22px;object-fit:cover;margin:0 auto 18px;display:block;box-shadow:0 6px 18px rgba(0,0,0,.12)}'
+      + '.g-title{font-size:24px;font-weight:700;margin:0 0 6px;letter-spacing:.5px}.g-sub{font-size:14px;color:var(--g-sub);margin:0 0 20px}'
+      + '.g-intro{font-size:15px;line-height:1.75;color:#3a3f47;text-align:left;background:#f6f8fa;border-radius:14px;'
+      + 'padding:16px 18px;margin:0 0 22px;white-space:pre-wrap;word-break:break-word}'
+      + '.g-btn{display:block;width:100%;border:none;background:linear-gradient(180deg,var(--g-primary),var(--g-primary-d));'
+      + 'color:#fff;font-size:17px;font-weight:600;padding:16px;border-radius:14px;margin-bottom:12px;box-shadow:0 8px 20px rgba(7,193,96,.32)}'
+      + '.g-copy{display:block;width:100%;border:1px solid #d7dde3;background:#fff;color:#5a6470;font-size:14px;padding:12px;border-radius:12px}'
+      + '.g-tip{font-size:13px;color:var(--g-sub);margin:16px 0 0;line-height:1.6}'
+      + '.g-empty{text-align:center;color:var(--g-sub);padding:40px 10px;font-size:15px;line-height:1.8}.g-empty .em{font-size:40px;display:block;margin-bottom:12px}';
+
+    function buildGuideHtml(f) {
+      var inner;
+      if (!f.enabled) {
+        inner = '<div class="g-empty"><span class="em">📦</span>引导页尚未配置<br>请在内容盒子后台「引导页」中编辑并发布</div>';
+      } else {
+        var title = f.title || '下载安装';
+        var sub = f.subtitle || '';
+        var intro = f.intro || '';
+        var apk = f.apkUrl || '';
+        var btn = f.buttonText || '立即下载安装';
+        var h = '';
+        if (f.icon) h += '<img class="g-icon" src="' + esc(f.icon) + '" alt="icon"/>';
+        h += '<h1 class="g-title">' + esc(title) + '</h1>';
+        if (sub) h += '<p class="g-sub">' + esc(sub) + '</p>';
+        if (intro) h += '<div class="g-intro">' + esc(intro).replace(/\n/g, '<br>') + '</div>';
+        if (apk) {
+          h += '<button class="g-btn" disabled>' + esc(btn) + '</button>';
+          h += '<button class="g-copy" disabled>复制下载链接</button>';
+        } else {
+          h += '<div class="g-tip">尚未配置安装包链接，请联系管理员。</div>';
+        }
+        h += '<p class="g-tip">下载完成后，按系统提示完成安装即可使用。</p>';
+        inner = h;
+      }
+      return '<!DOCTYPE html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
+        + '<style>' + GUIDE_CSS + '</style></head><body><div class="guide-wrap"><div class="guide-card" id="card">' + inner + '</div></div></body></html>';
+    }
+
+    function updatePreview() {
+      var siteTitle = (content.config && content.config.siteTitle) || '下载安装';
+      var f = {
+        enabled: $('#g_enabled').checked,
+        title: $('#g_title').value.trim() || siteTitle,
+        subtitle: $('#g_subtitle').value.trim(),
+        intro: $('#g_intro').value,
+        apkUrl: $('#g_apk').value.trim(),
+        buttonText: ($('#g_btn').value || '').trim(),
+        icon: currentIcon
+      };
+      var ifr = $('#g_preview');
+      if (ifr) ifr.srcdoc = buildGuideHtml(f);
+    }
+
+    ['g_enabled', 'g_title', 'g_subtitle', 'g_intro', 'g_apk', 'g_btn'].forEach(function (id) {
+      var el = document.getElementById(id);
+      if (el) { el.addEventListener('input', updatePreview); el.addEventListener('change', updatePreview); }
+    });
+    updatePreview();
 
     $('#g_save').onclick = function () {
       content.config = content.config || {};
@@ -667,11 +776,35 @@
         intro: $('#g_intro').value,
         apkUrl: ($('#g_apk').value || '').trim(),
         buttonText: ($('#g_btn').value || '立即下载安装').trim(),
-        icon: ($('#g_icon').value || '').trim()
+        icon: currentIcon
       };
       CBStore.saveDraft(content);
       toast('已保存（点「发布」推上线后生效）');
     };
+  }
+
+  // 上传图片居中裁剪为 size×size 正方形（兼容横屏/竖屏/长图），输出 PNG dataURL
+  function resizeImageToSquare(file, size, cb, errCb) {
+    var reader = new FileReader();
+    reader.onload = function (e) {
+      var img = new Image();
+      img.onload = function () {
+        try {
+          var w = img.width, h = img.height;
+          var side = Math.min(w, h);
+          var sx = (w - side) / 2, sy = (h - side) / 2;
+          var canvas = document.createElement('canvas');
+          canvas.width = size; canvas.height = size;
+          var ctx = canvas.getContext('2d');
+          ctx.drawImage(img, sx, sy, side, side, 0, 0, size, size);
+          cb(canvas.toDataURL('image/png'));
+        } catch (err) { errCb && errCb(err && err.message ? err.message : '处理失败'); }
+      };
+      img.onerror = function () { errCb && errCb('图片解码失败'); };
+      img.src = e.target.result;
+    };
+    reader.onerror = function () { errCb && errCb('文件读取失败'); };
+    reader.readAsDataURL(file);
   }
 
   function renderTools(panel) {

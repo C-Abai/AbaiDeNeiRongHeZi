@@ -1,4 +1,4 @@
-const CACHE = 'contentbox-v70';
+const CACHE = 'contentbox-v76';
 const SC = 'AK6QIELR67';
 const ASSETS = [
   './index.html?sharecode=' + SC,
@@ -105,9 +105,16 @@ function cacheFirst(event) {
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
   const url = event.request.url;
+  const req = event.request;
   // 预览资源（带 pv=1）：始终走网络、不进缓存，确保后台「预览」所见即所得
   if (url.indexOf('pv=1') > -1) {
-    event.respondWith(fetch(event.request));
+    event.respondWith(fetch(req));
+    return;
+  }
+  // 导航请求（HTML 文档）：网络优先，确保每次扫码 / 打开都是最新页面
+  // 根治「部署后第一次打开仍是旧版」——旧 SW 先吐旧缓存、新版要等下次刷新的竞态。
+  if (req.mode === 'navigate') {
+    event.respondWith(netFirst(event));
     return;
   }
   // 后台管理页：网络优先（离线回退缓存），发布后打开即最新
@@ -125,9 +132,10 @@ self.addEventListener('fetch', (event) => {
     event.respondWith(staleWhileRevalidate(event));
     return;
   }
-  // 应用外壳：缓存优先即时返回（重开即秒开，无网络往返），后台静默刷新保证发布后更新
+  // 应用外壳（js/css/icon/manifest）：网络优先，保证发布后立即生效（离线回退缓存）
+  // 原「缓存优先」会在部署后第一次打开时先吐旧壳，导致扫码/跳转看到旧版，故改为网络优先。
   if (isShellUrl(url)) {
-    event.respondWith(staleWhileRevalidate(event));
+    event.respondWith(netFirst(event));
     return;
   }
   // 其他静态资源：缓存优先，离线可用

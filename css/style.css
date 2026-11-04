@@ -449,7 +449,8 @@ textarea { min-height: 90px; resize: vertical; }
   padding: 12px 16px; display: flex; align-items: center; gap: 12px;
 }
 .admin-bar .ab-title { font-weight: 700; font-size: 16px; flex: 1; }
-.admin-tabs { display: flex; gap: 6px; padding: 12px 16px 0; }
+.admin-tabs { display: flex; gap: 6px; padding: 12px 16px 0; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+.admin-tabs::-webkit-scrollbar { display: none; }
 .admin-tabs .tab { flex: none; padding: 8px 16px; }
 .admin-list { padding: 12px 16px; }
 .empty { text-align: center; color: var(--muted); padding: 40px 0; }
@@ -1030,3 +1031,34 @@ body.wallpaper-full .chat-bubble { backdrop-filter: blur(6px); -webkit-backdrop-
 .chat-seg-del { margin-top: 6px; }
 body.admin-dark .chat-seg-item { background: rgba(255,255,255,.04); border-color: rgba(255,255,255,.12); }
 body.admin-dark .chat-seg-ta { background: #20242b; color: #e6e8eb; border-color: rgba(255,255,255,.15); }
+
+/* 引导页图标上传控件 */
+.icon-upload { display: flex; align-items: center; gap: 14px; }
+.icon-prev { width: 72px; height: 72px; border-radius: 16px; background: #f2f5f8; border: 1px dashed #d7dde3; display: flex; align-items: center; justify-content: center; overflow: hidden; flex: none; }
+.icon-prev img { width: 100%; height: 100%; object-fit: cover; }
+.icon-prev .ph { font-size: 12px; color: #aab2bb; }
+.icon-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+/* 后台引导页独立地址展示框 */
+.guide-url-box { margin-top: 16px; background: #f6f8fa; border: 1px solid #e3e8ee; border-radius: 12px; padding: 12px 14px; }
+.guide-url-box .gub-lbl { font-size: 12px; color: #8a9099; margin-bottom: 8px; }
+.guide-url-box .gub-row { display: flex; gap: 8px; align-items: stretch; }
+.guide-url-box .gub-input { flex: 1; min-width: 0; font-size: 12px; color: #3a3f47; background: #fff; border: 1px solid #d7dde3; border-radius: 8px; padding: 8px 10px; }
+.guide-url-box .gub-input:focus { outline: none; border-color: var(--green); }
+
+/* 引导页实时预览 */
+.guide-preview-box { margin: 4px 0 18px; background: #f6f8fa; border: 1px solid #e3e8ee; border-radius: 14px; padding: 14px; }
+.guide-preview-box .gpb-lbl { font-size: 13px; color: #5a6470; margin-bottom: 12px; font-weight: 600; }
+.guide-preview-box .gpb-frame { width: 100%; max-width: 360px; margin: 0 auto; border-radius: 16px; overflow: hidden; box-shadow: 0 6px 22px rgba(0,0,0,0.12); background: #fff; }
+.guide-preview-box .gpb-iframe { width: 100%; height: 540px; border: none; display: block; background: #fff; }
+
+/* 苹果端「添加到主屏幕」引导弹层 */
+.ios-guide-mask { position: fixed; inset: 0; background: rgba(0,0,0,.55); display: flex; align-items: center; justify-content: center; z-index: 9999; padding: 20px; }
+.ios-guide-mask.hide { display: none; }
+.ios-guide-card { background: #fff; border-radius: 18px; max-width: 340px; width: 100%; padding: 22px 20px; box-shadow: 0 20px 60px rgba(0,0,0,.3); }
+.ios-guide-title { font-size: 19px; font-weight: 700; margin: 0 0 8px; text-align: center; }
+.ios-guide-sub { font-size: 14px; color: #5a6470; line-height: 1.6; margin: 0 0 14px; }
+.ios-guide-steps { margin: 0 0 18px; padding-left: 20px; }
+.ios-guide-steps li { font-size: 14px; line-height: 1.9; color: #2a2f36; }
+.ios-guide-steps b { color: #07c160; }
+.ios-guide-close { width: 100%; border: none; background: #07c160; color: #fff; font-size: 16px; font-weight: 600; padding: 13px; border-radius: 12px; cursor: pointer; }

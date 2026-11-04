@@ -104,7 +104,9 @@
   - 详见下方「§5c 换设备不换链接 · 实测步骤」。
 - ⚠️ **改 CSS/JS 后必须升 Service Worker 版本号**：改 `sw.js` 里的 `CACHE = 'contentbox-vXX'` 与 `meta.json` 的 `sw` 字段到新版本，
   否则老用户浏览器缓存名不变，会继续加载旧界面、看不到新优化。
-- 发布后提醒用户**杀 PWA 后台重进**，让新的 Service Worker（当前 v69）接管缓存。
+- ⚠️ **SW 注册地址版本号必须同步自增**：`js/app.js` 里 `navigator.serviceWorker.register('sw.js?sharecode=AK6QIELR67&v=XX')` 的 `&v=` 与 `sw.js` 的 `CACHE` 版本号**必须一起 +1**（当前 v76）。
+  原因：注册 URL 带版本号后，每次部署脚本地址都不同，浏览器会强制重新下载 SW，实现「一次刷新即生效」；若只升 `CACHE` 不升 `&v=`，旧 app.js 仍注册旧 URL，浏览器会复用缓存中的旧 SW，导致更新卡住、要反复刷新才生效（2026-11-04 用户反馈「刷新好久」即此问题）。
+- 发布后提醒用户**杀 PWA 后台重进或 Ctrl+Shift+R 强刷一次**，让新的 Service Worker 接管（首次升级到带 &v= 机制需一次强刷，之后每次部署自动一次刷新即更新）。
 
 ## 5c. 换设备不换链接 · 实测步骤（2026-11-04 真实新设备测试：失败→已定位根因）
 
@@ -202,5 +204,61 @@
 - **要彻底重来**：`clone` 仓库 → 改 → 同 `appId` 部署，链接不变。
 
 ---
+
+## 9. 引导页（v70+，重要约束）
+
+- **引导页网址**：`https://content-box-24323.app.workbuddy.host/guide.html?sharecode=AK6QIELR67`
+  （主网址下的独立路径，**可单独发给用户**，由后台「引导页」tab 控制内容）。
+- **数据源**：`guide.html` 已改为读 GitHub raw 的 `content.json`（与主应用同一份，带 CORS），
+  并用 `HEAD Content-Length` 做变更信号 + localStorage 缓存，避免每次拉 1.1MB。
+- **改引导页内容的发布流程**：后台「引导页」tab 改好 → 让助手把 `content.json` **推到 GitHub** 即可，
+  **无需重新部署**（主应用与引导页会同时同步）。
+- ⚠️ **致命约束（务必记住）**：本平台「发布/站点」能力 **一个工作区/会话只能有一个 app 链接**。
+  不要把第二个目录（如 `guide-app/`）用 `workbuddy_sites_deploy` 部署——它会复用主应用的 appId，
+  **把内容盒子整个覆盖成引导页**（已发生过，靠重新部署 `pwa-content-app/` 才恢复）。
+  若要引导页拥有**完全独立的域名**，只能：新建一个 WorkBuddy 任务窗口，在那里单独部署 `guide-app/`
+  （它读的是同一份 GitHub content.json，仍由主应用后台控制内容）。
+- 本地 `guide-app/` 目录是「独立部署版」原型，本会话内**不要部署**（见上），留作独立域名方案的素材。
+
+---
+
+## 2026-11-04 补充：后台「引导页」tab 看不到的修复（v71）
+
+- **现象**：用户在后台看不到「引导页」tab。经核查线上 `js/admin.js` 本就含 `data-t="guide"`（第 197/230/646 行），代码部署正确，故非代码缺失。
+- **根因 1（主因）**：Service Worker 缓存未刷新。旧 SW 缓存版本 `contentbox-v70`，引导页 tab 恰是 v70 新增；用户此前访问过旧版后台，SW 一直喂旧 `js/admin.js` 且版本号未变不触发重拉。
+- **根因 2（隐患）**：后台 `.admin-tabs` 用 `display:flex; flex:none` 无换行/无横向滚动，窄屏（手机/APK WebView/窄窗口）下 5 个 tab 被挤出屏幕，靠后的「引导页」被隐藏。
+- **修复**：`sw.js` 缓存版本升 `v70→v71`（强制重拉全部资源）；`css/style.css` 的 `.admin-tabs` 加 `overflow-x:auto` + 隐藏滚动条（tab 永不裁切，可横向滑动）。
+- **验证**：线上 sw.js=contentbox-v71、style.css 含 overflow-x、js/admin.js 含引导页 tab，三者均确认生效。
+- **用户侧生效动作**：刷新/重开后台即可；若 APK 内仍显示旧版，关掉 App 重开或清站点数据一次。
+
+## 2026-11-04 补充：后台门禁钥匙 ≠ 内容 sharecode（重要坑）
+
+- **现象**：用户用 `admin.html?sharecode=AK6QIELR67` 打开后台，页面显示「404 · 页面不存在」（标题仍是"后台管理 - 内容盒子"，说明外壳已加载、被门禁拦下）。
+- **根因**：`js/admin.js` 第 87–92 行有后台门禁：`const ADMIN_KEY='nebadmin2026'`；仅当 URL 带 `?key=nebadmin2026` 时才加载后台，否则渲染「404 · 页面不存在」。`sharecode` 只是内容数据访问钥匙（`content.json` 拉取用），**不是后台门禁钥匙**。助手此前误把后台链接写成 `?sharecode=...` 导致 404。
+- **正确后台地址（唯一）**：`https://content-box-24323.app.workbuddy.host/admin.html?key=nebadmin2026`（sharecode 后台内默认取 AK6QIELR67，无需手加）。
+- **公开端「关于」入口**：`js/app.js` 第 740 行 `<a class="admin-mini" href="admin.html?key=nebadmin2026">` 即正确后台入口；手机 App 内打开后台能进且为新版（v71 含引导页），电脑若显示旧版是 PWA Service Worker 旧缓存所致，强制刷新(Ctrl+Shift+R)或清除站点存储即可。
+- **约定**：后台/管理类链接统一用 `?key=nebadmin2026`；APK 直装链接、引导页链接、内容数据仍用 `?sharecode=AK6QIELR67`。两者不可混用。
+
+## 2026-11-04 补充：引导页图标改上传 + 引导页展示独立网址（v72）
+
+- **后台图标改为上传**：`js/admin.js` 的 `renderGuide` 原「图标地址」文本框改为「选择图片」上传（`g_icon_file`）+ 预览（`g_icon_prev`）+ 移除（`g_icon_del`）。新增模块级函数 `resizeImageToSquare(file, 256, cb, errCb)`：用 FileReader+Image+canvas 居中裁剪为 256×256 正方形 PNG dataURL（兼容横屏/竖屏/长图）。icon 存于 `content.config.guide.icon`（base64 PNG），随「发布」推 GitHub 生效。`style.css` 新增 `.icon-upload/.icon-prev/.icon-actions/.ph` 样式。
+- **引导页独立网址展示位置（已更正）**：用户要求放在**后台「引导页」设置面板底部**，而非引导页网页内。故 `guide.html` 的 `.g-urlbar`/`showUrlBar` 已**撤销**（v73）。改为在 `js/admin.js` 的 `renderGuide` 末尾新增 `.guide-url-box` 框，用 `location.origin + '/guide.html?sharecode=AK6QIELR67'` 动态生成完整独立地址并带「复制」按钮（`g_url_cp`）。`style.css` 配套 `.guide-url-box/.gub-*` 样式。
+- **部署**：SW 升 `v71→v72`（`sw.js`/`meta.json`），已重部署 `pwa-content-app`（同 appId `…24323`）。验证：线上 sw=v72、guide.html 含 urlbar、admin.js 含上传裁剪、style.css 含 icon-upload。
+- **用户侧生效**：电脑后台需 `Ctrl+Shift+R` 强刷一次以加载新 admin.js（v72 SW）。上传图标后点「保存」再「发布」，助手推 content.json 到 GitHub 即同步；引导页无需重部署即更新图标/网址条。
+
+## 2026-11-04 补充：后台「引导页」实时预览（v74）
+
+- **需求**：用户在后台「引导页」设置面板里，改完设置后能**在线先预览效果**（发布前看成品）。
+- **实现**：`js/admin.js` 的 `renderGuide` 在面板顶部新增 `.guide-preview-box`，内含一个 `<iframe id="g_preview">`。新增 `GUIDE_CSS`（与 `guide.html` 完全同款样式字符串）+ `buildGuideHtml(f)`（注入当前表单值，复刻 guide.html 的 `render()`，按钮置 `disabled` 防止误跳转/下载）+ `updatePreview()`（读当前表单 → 写 `ifr.srcdoc`）。对 `g_enabled/g_title/g_subtitle/g_intro/g_apk/g_btn` 绑定 `input/change` 实时刷新；图标上传/移除（`currentIcon`）变更后也调 `updatePreview()`。`style.css` 新增 `.guide-preview-box/.gpb-lbl/.gpb-frame/.gpb-iframe`（iframe 高 540px、最大宽 360px 模拟手机视窗）。
+- **部署**：SW 升 `v73→v74`（`sw.js`/`meta.json`），已重部署 `pwa-content-app`。验证：线上 sw=v74、admin.js 含 `g_preview`/`buildGuideHtml`、style.css 含 `guide-preview-box`。
+
+## 2026-11-04 补充：二维码实时最新 + 苹果端「添加到主屏幕」引导（v75）
+
+- **问题背景**：用户把关于页「一键安装」按钮指向引导页网址（后台 `config.apkUrl` 填成引导页链接），并已启用引导页。但手机扫关于页二维码出现两现象：① 跳到的网页是旧版（内容未更新）；② 内容更新了，但点一键安装跳到引导页却显示「尚未配置/没启动」的空页。
+- **根因**：`sw.js` 对导航请求与外壳资源（index.html/app.js/guide.html/css）原用 `staleWhileRevalidate`（先吐旧缓存、后台刷新），部署后首次打开会先看到旧版，新版本要等下次刷新。引导页 `guide.html` 原靠 GitHub content.json 的 `Content-Length` 变化决定是否重新拉取，字节长度未变时会沿用本地旧缓存（引导页启用状态不更新 → 显「尚未配置」）。
+- **修复 1（实时最新）**：`sw.js` 的 fetch handler 改为——`navigation`（HTML 文档）与 `isShellUrl`（js/css/icon/manifest）均走 `netFirst`（网络优先、离线回退缓存）；`content.json` 仍 `staleWhileRevalidate`（应用层靠 meta.json 指纹判断是否需要全量，秒开安全）。`guide.html` 的 `init()` 改为：先用本地缓存秒开，随后**每次都 `loadFull()` 向 GitHub 取最新并覆盖渲染**（缓存仅作离线兜底），不再依赖 Content-Length 跳过。
+- **修复 2（苹果端引导）**：`js/app.js` 关于页安装区：iOS 设备按钮文案改为「➕ 添加到主屏幕」；点击不再只弹 toast，而是调用新增模块级函数 `showAddHomeGuide()` 弹出引导弹层（Safari 分享 → 添加到主屏幕 三步）。弹层 DOM 首次点击时创建并 append 到 body，支持点遮罩/「我知道了」关闭。`css/style.css` 新增 `.ios-guide-mask/.ios-guide-card/.ios-guide-title/.ios-guide-sub/.ios-guide-steps/.ios-guide-close` 样式。
+- **部署**：SW 升 `v74→v75`（`sw.js`/`meta.json`），已重部署 `pwa-content-app`。验证：线上 sw=v75、sw.js 含 `mode==='navigate'` 分支、guide.html 含 `loadFull()`、app.js 含 `showAddHomeGuide`、style.css 含 `ios-guide-mask`。
+- **注意**：关于页与引导页读的是**同一份** GitHub `content.json`（`store.js` 第14行 `GITHUB_CONTENT_URL` 与 `guide.html` 第87行同源），故数据不会"关于页更新、引导页不更新"；若引导页显「尚未配置」，先确认后台「引导页」已启用并「发布」推到 GitHub。
 
 *本手册由助手在 v69 发布后整理并更新，作为跨设备恢复上下文使用。*

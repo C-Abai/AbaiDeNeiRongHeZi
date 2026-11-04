@@ -210,8 +210,12 @@
         try { sessionStorage.setItem('cb_updated_toast', '1'); } catch (e) {} // 标记：本次刷新来自更新
         location.reload();
       });
-      navigator.serviceWorker.register('sw.js?sharecode=AK6QIELR67').then(function (reg) {
+      // 注册 URL 带 &v= 版本号：每次部署脚本地址都不同，浏览器必须重新下载 SW，
+      // 不再依赖对 sw.js 的 HTTP 缓存复用，从而「一次刷新就生效」，杜绝反复刷新才更新的卡顿。
+      navigator.serviceWorker.register('sw.js?sharecode=AK6QIELR67&v=76').then(function (reg) {
         if (!reg) return;
+        // 主动触发一次更新检查（register 本身也会检查，这里再兜一层，缩短检测时延）
+        if (reg.update) { try { reg.update(); } catch (e) {} }
         // 若已有一个 waiting 的新版本，立即让它接管
         if (reg.waiting) reg.waiting.postMessage({ type: 'SKIP_WAITING' });
         // 监听后续新版本安装完成
@@ -767,9 +771,10 @@
       ? '<div class="ios-tip">🍎 苹果设备暂不支持下载安装包。请用 <b>Safari</b> 打开本页 → 点底部「分享」图标 → <b>添加到主屏幕</b>，即可像 App 一样使用。</div>'
       : '';
     // WebView 内不渲染「下载 APK」按钮与二维码（避免被应用商店判定为 APK 内诱导下载），改为提示已安装
+    const installBtnLabel = isIOS ? '➕ 添加到主屏幕' : '📲 一键安装';
     const installActions = isWebView
       ? '<div class="install-actions"><div class="inapp-tip">✅ 你已在 App 内打开，无需重复安装</div></div>'
-      : '<div class="install-actions"><button class="btn install-app-btn" id="installAppBtn">📲 一键安装</button></div>'
+      : '<div class="install-actions"><button class="btn install-app-btn" id="installAppBtn">' + installBtnLabel + '</button></div>'
         + '<div class="qr-wrap"><div class="qr" id="aboutQr"></div>'
         + '<p class="card-desc" style="text-align:center;font-size:12px;margin:8px 0 0">手机扫码在浏览器打开下载页</p></div>';
     let installHtml = '<div class="section-title">📲 安装 APP</div>'
@@ -794,7 +799,7 @@
       $('#installAppBtn').addEventListener('click', function () {
         if (window.__installPrompt) { installNow(); return; }
         if (isWx) { toast('请点右上角 ··· 在浏览器中打开本页后再下载'); return; }
-        if (isIOS) { toast('请用 Safari 打开本页，点底部「分享」→ 添加到主屏幕'); return; }
+        if (isIOS) { showAddHomeGuide(); return; }
         if (apkUrl) { location.href = apkUrl; return; }
         toast('请用浏览器菜单「安装 / 添加到主屏幕」');
       });
@@ -829,6 +834,30 @@
       applyEffectiveTheme();
       const m = $('#tsMode'); if (m) m.textContent = on ? '暗调' : '浅色';
     });
+  }
+
+  // 苹果设备「添加到主屏幕」引导弹层（iOS 不支持直接安装 APK，需 Safari 分享 → 添加到主屏幕）
+  function showAddHomeGuide() {
+    var mask = document.getElementById('iosGuideMask');
+    if (!mask) {
+      mask = document.createElement('div');
+      mask.className = 'ios-guide-mask';
+      mask.id = 'iosGuideMask';
+      mask.innerHTML = '<div class="ios-guide-card">'
+        + '<div class="ios-guide-title">📱 添加到主屏幕</div>'
+        + '<div class="ios-guide-sub">苹果设备不支持直接安装安装包。按以下步骤把本应用添加到主屏幕，即可像 App 一样离线使用：</div>'
+        + '<ol class="ios-guide-steps">'
+        + '<li>点击 Safari 底部工具栏的 <b>分享</b> 图标（⬆️ 方框带向上箭头）</li>'
+        + '<li>在弹出菜单中下滑，点击 <b>「添加到主屏幕」</b></li>'
+        + '<li>点击右上角 <b>「添加」</b>，完成</li>'
+        + '</ol>'
+        + '<button class="ios-guide-close" id="iosGuideClose">我知道了</button></div>';
+      document.body.appendChild(mask);
+      mask.addEventListener('click', function (e) { if (e.target === mask) mask.classList.add('hide'); });
+      var closeBtn = document.getElementById('iosGuideClose');
+      if (closeBtn) closeBtn.onclick = function () { mask.classList.add('hide'); };
+    }
+    mask.classList.remove('hide');
   }
 
   function escNl(s) {

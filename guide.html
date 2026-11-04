@@ -83,7 +83,10 @@
 
   <script>
     (function () {
-      var SC = new URLSearchParams(location.search).get('sharecode') || 'AK6QIELR67';
+      // 数据源：与主应用共用 GitHub 上的 content.json（带 CORS，后台改了推上线即同步，无需重部署）
+      var RAW = 'https://raw.githubusercontent.com/C-Abai/AbaiDeNeiRongHeZi/refs/heads/main/content.json';
+      var CACHE_KEY = 'cb_guide_cache_v1';
+      var LEN_KEY = 'cb_guide_len_v1';
       var card = document.getElementById('card');
       var toastEl = document.getElementById('toast');
 
@@ -135,10 +138,39 @@
         };
       }
 
-      fetch('./content.json?sharecode=' + encodeURIComponent(SC) + '&pv=1', { cache: 'no-store' })
-        .then(function (r) { return r.ok ? r.json() : Promise.reject(); })
-        .then(render)
-        .catch(function () { showEmpty(); });
+      // 先用本地缓存即时渲染（消除白屏），再用 HEAD 取 Content-Length 作为变更信号，
+      // 仅当长度变化才重新拉取全量（避免每次都下载 1.1MB）。
+      function renderCached() {
+        try { var s = localStorage.getItem(CACHE_KEY); if (s) { render(JSON.parse(s)); return true; } } catch (e) {}
+        return false;
+      }
+      function headLen() {
+        return fetch(RAW + '?_h=' + Date.now(), { method: 'HEAD', cache: 'no-store' })
+          .then(function (r) { return r.ok ? (r.headers.get('Content-Length') || '') : ''; })
+          .catch(function () { return ''; });
+      }
+      function loadFull() {
+        return fetch(RAW + '?_h=' + Date.now(), { cache: 'no-store' })
+          .then(function (r) { return r.ok ? r.json() : Promise.reject(); });
+      }
+      function init() {
+        // 实时优先：先用本地缓存秒开（若有），随后每次都向 GitHub 取最新并覆盖渲染，
+        // 避免「靠 Content-Length 判断跳过拉取」导致的旧配置残留（如引导页启用状态不更新）。
+        var hadCache = renderCached();
+        loadFull()
+          .then(function (data) {
+            try {
+              var raw = JSON.stringify(data);
+              localStorage.setItem(CACHE_KEY, raw);
+              try { localStorage.setItem(LEN_KEY, String(raw.length)); } catch (e) {}
+            } catch (e) {}
+            render(data);
+          })
+          .catch(function () {
+            if (!hadCache) showEmpty();
+          });
+      }
+      init();
     })();
   </script>
 </body>
