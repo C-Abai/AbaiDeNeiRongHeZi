@@ -1062,3 +1062,62 @@ body.admin-dark .chat-seg-ta { background: #20242b; color: #e6e8eb; border-color
 .ios-guide-steps li { font-size: 14px; line-height: 1.9; color: #2a2f36; }
 .ios-guide-steps b { color: #07c160; }
 .ios-guide-close { width: 100%; border: none; background: #07c160; color: #fff; font-size: 16px; font-weight: 600; padding: 13px; border-radius: 12px; cursor: pointer; }
+
+/* ===== 强制提示更新弹窗（公开端 / 预览 iframe / 后台设置共用） ===== */
+.upd-mask { position: fixed; inset: 0; z-index: 10000; }
+.upd-mask.upd-full {
+  background: rgba(12, 16, 22, .62); display: flex; align-items: center; justify-content: center;
+  padding: 24px; -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px);
+}
+.upd-mask.upd-bubble { background: transparent; pointer-events: none; padding: 0; }
+.upd-card {
+  position: relative; width: 100%; max-width: 360px; text-align: center;
+  background: var(--card-bg, #fff); color: var(--text, #1f2329);
+  border: 1px solid var(--line, #ebedf0); border-radius: 20px;
+  padding: 30px 24px 24px; box-shadow: 0 20px 60px rgba(0,0,0,.24);
+  -webkit-backdrop-filter: blur(var(--card-blur, 0px)); backdrop-filter: blur(var(--card-blur, 0px));
+  pointer-events: auto;
+}
+.upd-bubble .upd-card {
+  position: fixed; top: max(12px, env(safe-area-inset-top)); left: 12px;
+  max-width: 320px; width: calc(100vw - 24px); padding: 20px 18px 18px;
+  border-radius: 16px; box-shadow: 0 12px 36px rgba(0,0,0,.20);
+}
+.upd-icon { width: 72px; height: 72px; border-radius: 18px; object-fit: cover; display: block; margin: 0 auto 14px; box-shadow: 0 6px 18px rgba(0,0,0,.12); }
+.upd-title { font-size: 20px; font-weight: 700; margin: 0 0 10px; line-height: 1.4; }
+.upd-text { font-size: 14px; line-height: 1.8; color: var(--muted, #8a8f99); margin: 0 0 20px; word-break: break-word; }
+.upd-btn {
+  display: block; width: 100%; border: none; cursor: pointer; text-decoration: none; box-sizing: border-box;
+  background: var(--upd-accent, #07c160); color: #fff; font-size: 16px; font-weight: 600;
+  padding: 13px 16px; border-radius: 12px; box-shadow: 0 8px 20px rgba(7,193,96,.22);
+}
+.upd-btn:active { transform: scale(.98); }
+.upd-btn:disabled { cursor: default; opacity: .95; }
+.upd-close {
+  position: absolute; top: 8px; right: 10px; width: 30px; height: 30px;
+  border: none; background: transparent; color: var(--muted, #8a8f99);
+  font-size: 24px; line-height: 1; cursor: pointer; border-radius: 50%;
+}
+.upd-close:hover { background: rgba(0,0,0,.06); }
+
+/* 明暗：auto 跟随 body.dim；light / dark 强制覆盖 */
+body.dim .upd-mask.upd-auto .upd-card { background: rgba(24,27,36,.94); color: #eaedf1; border-color: rgba(255,255,255,.14); }
+body.dim .upd-mask.upd-auto .upd-text, body.dim .upd-mask.upd-auto .upd-close { color: #a9b0bb; }
+.upd-mask.upd-light .upd-card, .upd-inline-preview.upd-light .upd-card { background: #fff; color: #1f2329; border-color: #ebedf0; }
+.upd-mask.upd-light .upd-text, .upd-mask.upd-light .upd-close,
+.upd-inline-preview.upd-light .upd-text { color: #8a8f99; }
+.upd-mask.upd-dark .upd-card, .upd-inline-preview.upd-dark .upd-card { background: #1e222a; color: #eaedf1; border-color: rgba(255,255,255,.14); }
+.upd-mask.upd-dark .upd-text, .upd-mask.upd-dark .upd-close,
+.upd-inline-preview.upd-dark .upd-text { color: #a9b0bb; }
+
+/* 后台「站点设置」里的缩小预览（不产生 fixed 浮层） */
+.upd-inline-preview { display: flex; justify-content: center; padding: 8px; }
+.upd-inline-preview .upd-card { position: relative; max-width: 300px; box-shadow: 0 6px 20px rgba(0,0,0,.12); }
+.n-mini-box { background: #f6f8fa; border: 1px solid #e3e8ee; border-radius: 12px; padding: 10px; margin: 10px 0; min-height: 90px; }
+.n-mini-box .n-mini-lbl { font-size: 12px; color: #8a9099; margin-bottom: 6px; }
+.n-warn { font-size: 12px; color: #a86a00; line-height: 1.7; background: #fff8e8; border-radius: 8px; padding: 8px 10px; margin: 8px 0; }
+body.admin-dark .upd-inline-preview.upd-auto .upd-card { background: #1e222a; color: #eaedf1; border-color: rgba(255,255,255,.14); }
+body.admin-dark .upd-inline-preview.upd-auto .upd-text { color: #a9b0bb; }
+body.admin-dark .n-mini-box { background: rgba(255,255,255,.05); border-color: rgba(255,255,255,.12); }
+body.admin-dark .n-mini-box .n-mini-lbl { color: #aeb6c2; }
+body.admin-dark .n-warn { background: rgba(255,190,80,.10); color: #e8c98a; }

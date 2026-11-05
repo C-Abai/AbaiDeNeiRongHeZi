@@ -1,4 +1,4 @@
-const CACHE = 'contentbox-v79';
+const CACHE = 'contentbox-v80';
 const SC = 'AK6QIELR67';
 const ASSETS = [
   './index.html?sharecode=' + SC,
@@ -7,6 +7,7 @@ const ASSETS = [
   './watch.html?sharecode=' + SC,
   './css/style.css?sharecode=' + SC,
   './js/store.js?sharecode=' + SC,
+  './js/notice.js?sharecode=' + SC,
   './js/app.js?sharecode=' + SC,
   './js/admin.js?sharecode=' + SC,
   './icon.svg?sharecode=' + SC,
@@ -47,7 +48,7 @@ self.addEventListener('message', (event) => {
 
 // 判断是否为应用外壳资源（index/admin/preview/watch 页面、css、js、icon、manifest）
 function isShellUrl(url) {
-  return /\/(index\.html|admin\.html|preview\.html|watch\.html|css\/style\.css|js\/store\.js|js\/app\.js|js\/admin\.js|icon\.svg|manifest\.webmanifest)(\?|$)/.test(url);
+  return /\/(index\.html|admin\.html|preview\.html|watch\.html|css\/style\.css|js\/store\.js|js\/notice\.js|js\/app\.js|js\/admin\.js|icon\.svg|manifest\.webmanifest)(\?|$)/.test(url);
 }
 
 // 网络优先：启动即同步最新；失败回退「当前版本」缓存（离线可用）

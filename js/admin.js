@@ -531,6 +531,7 @@
   function renderSettings(panel) {
     const c = content.config || {};
     const t = c.theme || {};
+    const n = c.updateNotice || {};
 
     // 折叠分组：默认收纳（除非本机曾展开过），点标题头展开/收拢
     function collOpen(gid) { try { return localStorage.getItem('cb_admin_coll_' + gid) === '1'; } catch (e) { return false; } }
@@ -540,6 +541,30 @@
         + '<div class="coll-head"><span>' + title + '</span><span class="coll-arrow">▼</span></div>'
         + '<div class="coll-body"' + (open ? '' : ' style="display:none"') + '>' + inner + '</div></div>';
     }
+
+    // 「强制提示更新」：单独折叠卡片，避免站点设置面板过长
+    const noticeInner = '<div class="sub">📢 进入即弹窗（公开端首页 / 手机 APP 首页）</div>'
+      + '<div class="checkbox-row"><label class="switch"><input type="checkbox" id="n_enabled" ' + (n.enabled ? 'checked' : '') + '/><span class="slider"></span></label><label for="n_enabled">启用强制提示（默认关闭；开启后访客进入即看到）</label></div>'
+      + '<div class="field"><label>展示方式</label><select id="n_mode">'
+      + '<option value="fullscreen"' + (n.mode !== 'bubble' ? ' selected' : '') + '>强制全屏（居中遮罩，默认无关闭按钮）</option>'
+      + '<option value="bubble"' + (n.mode === 'bubble' ? ' selected' : '') + '>气泡卡片（左上角，带关闭按钮）</option>'
+      + '</select></div>'
+      + '<div class="field"><label>弹窗主题</label><select id="n_theme">'
+      + '<option value="auto"' + (n.theme !== 'light' && n.theme !== 'dark' ? ' selected' : '') + '>跟随站点（浅色 / 暗调自动适配）</option>'
+      + '<option value="light"' + (n.theme === 'light' ? ' selected' : '') + '>强制浅色</option>'
+      + '<option value="dark"' + (n.theme === 'dark' ? ' selected' : '') + '>强制深色</option>'
+      + '</select></div>'
+      + '<div class="color-row"><div class="color-item"><span>强调色（按钮）</span><input type="color" id="n_accent" value="' + (/^#[0-9a-f]{6}$/i.test(n.accent || '') ? n.accent : '#07c160') + '"/></div></div>'
+      + '<div class="field"><label>标题</label><input type="text" id="n_title" value="' + esc(n.title || '') + '" placeholder="如：发现新版本 v2.0"/></div>'
+      + '<div class="field"><label>正文（支持换行，居中展示）</label><textarea id="n_text" class="auth-textarea" placeholder="本次更新内容…">' + esc(n.text || '') + '</textarea></div>'
+      + '<div class="field"><label>图标（可选，上传图片自动压缩）</label><input type="file" id="n_icon_file" accept="image/*"/><img class="cover-preview" id="n_icon_prev" src="' + (n.icon || '') + '" style="' + (n.icon ? '' : 'display:none') + '"/></div>'
+      + '<div class="row"><button class="btn ghost" id="n_icon_clear">清除图标</button><button class="btn ghost" id="n_fullpreview">👁 在后台全屏预览</button></div>'
+      + '<div class="field"><label>引导按钮文案</label><input type="text" id="n_btn_text" value="' + esc(n.buttonText || '') + '" placeholder="如：前往更新"/></div>'
+      + '<div class="field"><label>引导按钮链接（更新网页 / 下载页，需以 http(s):// 开头）</label><input type="text" id="n_btn_url" value="' + esc(n.buttonUrl || '') + '" placeholder="https://..."/></div>'
+      + '<div class="checkbox-row"><input type="checkbox" id="n_every" ' + (n.everyTime !== false ? 'checked' : '') + '/><label for="n_every">每次进入都弹出（关闭则同一内容只弹一次）</label></div>'
+      + '<div class="n-warn">⚠️ 全屏模式默认不显示关闭按钮，请务必填写「引导按钮链接」，否则访客会被弹窗挡住；未填链接时系统会自动补一个关闭按钮兜底。</div>'
+      + '<div class="n-mini-box"><div class="n-mini-lbl">实时效果预览（与公开端「👁 预览」同步渲染）</div><div id="n_mini"></div></div>'
+      + '<p class="help">改完点下方「保存设置」写入本机草稿，再到顶部「发布」推上线后所有设备可见。编辑时右上角「👁 预览」也会实时显示弹窗效果。</p>';
 
     panel.innerHTML = '<div class="admin-list">'
       + '<div class="field"><label>站点名称</label><input type="text" id="s_title" value="' + esc(c.siteTitle || '') + '"/></div>'
@@ -584,6 +609,7 @@
         + '<div class="field"><label>导航按钮透明度：<span id="t_bop_v">' + (t.barOpacity == null ? (t.wallpaper ? 55 : 92) : t.barOpacity) + '</span> %</label><input type="range" id="t_bop" min="0" max="100" value="' + (t.barOpacity == null ? (t.wallpaper ? 55 : 92) : t.barOpacity) + '"/></div>'
         + '<p class="help">内容气泡 = 文章/工具/小工具面板等卡片背景（含黑科技页「小工具」内容栏），数值越小越透；导航按钮 = 最上方「文章/黑科技/关于」三个切换按钮（不含上方标题），数值越小越透。</p>'
         )
+      + collBlock('notice', '📢 强制提示更新（进入即弹窗 · 默认收纳）', noticeInner)
       + '<div class="row" style="margin-top:18px"><button class="btn" id="s_save">保存设置</button></div>'
       + '<p class="help">设置保存在本机草稿中，点「发布」推上线后所有人可见。改配色/壁纸时已实时预览本页效果。</p></div>';
 
@@ -604,6 +630,61 @@
         try { localStorage.setItem('cb_admin_coll_' + g.dataset.gid, willOpen ? '1' : '0'); } catch (e) {}
       });
     });
+
+    // ===== 强制提示更新：表单 → 实时小预览 → 同步到公开端预览 iframe =====
+    let noticeIcon = n.icon || '';
+    function noticeFormCfg() {
+      return {
+        enabled: $('#n_enabled').checked,
+        mode: $('#n_mode').value,
+        theme: $('#n_theme').value,
+        accent: $('#n_accent').value,
+        title: $('#n_title').value.trim(),
+        text: $('#n_text').value,
+        icon: noticeIcon,
+        buttonText: $('#n_btn_text').value.trim(),
+        buttonUrl: ($('#n_btn_url').value || '').trim(),
+        everyTime: $('#n_every').checked
+      };
+    }
+    function syncNoticeDraft(applyToContent) {
+      const cfg = noticeFormCfg();
+      const mini = $('#n_mini');
+      if (mini && window.CBNotice) mini.innerHTML = window.CBNotice.html(cfg, { force: true, inline: true, preview: true });
+      // 初始化只画预览，不把「看了一眼设置」误当成改动写进草稿
+      if (applyToContent === false) return;
+      if (content && content.config) content.config.updateNotice = cfg;
+      pushPreview();
+    }
+    ['n_enabled', 'n_mode', 'n_theme', 'n_accent', 'n_title', 'n_text', 'n_btn_text', 'n_btn_url', 'n_every'].forEach(function (id) {
+      const el = $('#' + id);
+      if (!el) return;
+      const onEdit = function () { syncNoticeDraft(true); };
+      el.addEventListener('input', onEdit);
+      el.addEventListener('change', onEdit);
+    });
+    $('#n_icon_file').onchange = async function (e) {
+      const file = e.target.files && e.target.files[0];
+      if (!file) return;
+      try {
+        noticeIcon = await CBStore.fileToResizedDataURL(file, 256, 0.9);
+        $('#n_icon_prev').src = noticeIcon;
+        $('#n_icon_prev').style.display = 'block';
+        syncNoticeDraft();
+      } catch (err) { toast('图标处理失败'); }
+    };
+    $('#n_icon_clear').onclick = function () {
+      noticeIcon = '';
+      $('#n_icon_prev').src = '';
+      $('#n_icon_prev').style.display = 'none';
+      syncNoticeDraft();
+    };
+    $('#n_fullpreview').onclick = function () {
+      if (!window.CBNotice) return;
+      window.CBNotice.mount(Object.assign({}, noticeFormCfg(), { enabled: true }), { force: true, preview: true });
+      toast('预览已弹出，点右上角 × 关闭');
+    };
+    syncNoticeDraft(false);
 
     let wallData = t.wallpaper || '';
     let iconData = (content.config && content.config.icon) || '';
@@ -733,6 +814,7 @@
         dimCardOpacity: parseInt($('#t_dimcard').value, 10),
         dimBlur: parseInt($('#t_dimblur').value, 10)
       };
+      content.config.updateNotice = noticeFormCfg();
       CBStore.saveDraft(content);
       toast('已保存');
     };
@@ -997,6 +1079,7 @@
           + (lk.description ? '<p class="card-desc">' + esc(lk.description) + '</p>' : '')
           + '<p class="card-desc" style="word-break:break-all">' + esc(lk.url) + '</p></div>'
           + '<div class="adm-actions"><span class="tool-toggle">合集：' + groupSelect(lk.id, lk.groupId) + '</span>'
+          + '<button class="btn ghost" data-toggle-url="' + lk.id + '">' + (lk.showUrl !== false ? '🌐 网址·显示' : '🚫 网址·隐藏') + '</button>'
           + '<button class="btn ghost" data-l-up="' + lk.id + '">↑ 上移</button>'
           + '<button class="btn ghost" data-l-down="' + lk.id + '">↓ 下移</button>'
           + '<button class="btn ghost" data-edit-link="' + lk.id + '">编辑</button>'
@@ -1043,6 +1126,7 @@
         + '<div class="field"><label>网址（需以 http:// 或 https:// 开头）</label><input type="text" id="lk_url" placeholder="https://..."/></div>'
         + '<div class="field"><label>链接介绍（可选，显示在名称下方）</label><input type="text" id="lk_desc" placeholder="一句话描述这个链接"/></div>'
         + '<div class="field"><label>图标（可选，上传图片，建议 256×256）</label><input type="file" id="lk_icon" accept="image/*"/><img class="cover-preview" id="lk_icon_prev" style="display:none"/></div>'
+        + '<div class="checkbox-row"><label class="switch"><input type="checkbox" id="lk_showurl" checked/><span class="slider"></span></label><label for="lk_showurl">在公开端展示网址（关闭后卡片只显示名称与介绍）</label></div>'
         + '<div class="row"><button class="btn" id="lk_add">添加快捷方式</button><button class="btn ghost" id="lk_save">保存更改</button></div>'
         + '<div id="lk_list" style="margin-top:14px">' + linkRows + '</div>'
         + '<p class="help">「添加快捷方式」即新增一条；「保存更改」保存本区全部改动（含合集归属、图标、介绍）。改完点顶部「发布」推上线后所有人可见。合集可新建 / 改名 / 取消（取消后其下快捷方式回到「未分组」）/ 用 ↑↓ 排序；每个快捷方式用「合集」下拉归入对应合集。快捷方式在每个合集（含未分组）内可用「↑ 上移 / ↓ 下移」自定义排序，顺序会同步到公开端。</p></div>';
@@ -1081,10 +1165,11 @@
         }
         c.links = c.links || [];
         const maxOrder = c.links.reduce(function (m, x) { return Math.max(m, (x.order || 0)); }, 0);
-        c.links.push({ id: CBStore.uid(), title: title, url: url, description: $('#lk_desc').value.trim(), icon: iconData, order: maxOrder + 1 });
+        c.links.push({ id: CBStore.uid(), title: title, url: url, description: $('#lk_desc').value.trim(), icon: iconData, showUrl: $('#lk_showurl').checked, order: maxOrder + 1 });
         CBStore.saveDraft(content);
         $('#lk_title').value = ''; $('#lk_url').value = ''; $('#lk_desc').value = '';
         $('#lk_icon').value = ''; $('#lk_icon_prev').style.display = 'none';
+        $('#lk_showurl').checked = true;
         draw();
         toast('已添加');
       };
@@ -1111,8 +1196,18 @@
         panel.addEventListener('click', function (e) {
           const up = e.target.closest('[data-l-up]');
           const down = e.target.closest('[data-l-down]');
+          const tg = e.target.closest('[data-toggle-url]');
           if (up) { e.preventDefault(); moveLink(up.getAttribute('data-l-up'), -1); }
           else if (down) { e.preventDefault(); moveLink(down.getAttribute('data-l-down'), 1); }
+          else if (tg) {
+            e.preventDefault();
+            const lk = (c.links || []).find(function (x) { return x.id === tg.getAttribute('data-toggle-url'); });
+            if (!lk) return;
+            lk.showUrl = lk.showUrl === false;   // 当前隐藏 → 显示；其余（含缺省）→ 隐藏
+            CBStore.saveDraft(content);
+            draw();
+            toast(lk.showUrl ? '公开端将显示该网址' : '公开端将隐藏该网址');
+          }
         });
       }
 
@@ -1187,6 +1282,7 @@
         + '<div class="field"><label>网址</label><input type="text" id="l_url" value="' + esc(lk.url) + '"/></div>'
         + '<div class="field"><label>链接介绍（可选）</label><input type="text" id="l_desc" value="' + esc(lk.description || '') + '"/></div>'
         + '<div class="field"><label>图标（可选，上传图片替换）</label><input type="file" id="l_icon" accept="image/*"/><img class="cover-preview" id="l_icon_prev" src="' + (lk.icon || '') + '" style="' + (lk.icon ? '' : 'display:none') + '"/></div>'
+        + '<div class="checkbox-row"><label class="switch"><input type="checkbox" id="l_showurl" ' + (lk.showUrl !== false ? 'checked' : '') + '/><span class="slider"></span></label><label for="l_showurl">在公开端展示网址</label></div>'
         + '<div class="row"><button class="btn" id="lSave">保存</button><button class="btn danger" id="lDel">删除</button><button class="btn ghost" id="lCancel">取消</button></div>';
       $('#modalMask').classList.add('show');
       let iconData = lk.icon || '';
@@ -1207,6 +1303,7 @@
         if (!title || !url) { toast('请填写名称和网址'); return; }
         if (!/^https?:\/\//i.test(url)) { toast('网址需以 http(s):// 开头'); return; }
         lk.title = title; lk.url = url; lk.description = $('#l_desc').value.trim(); lk.icon = iconData;
+        lk.showUrl = $('#l_showurl').checked;
         CBStore.saveDraft(content);
         closeModal();
         draw();

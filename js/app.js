@@ -178,6 +178,27 @@
     render();
   }
 
+  // ===== 强制提示更新弹窗：公开端冷启动 / 后台预览 iframe 共用 =====
+  // 预览模式每次 postMessage 都强制重绘，方便边改边看；正常模式同一份配置只弹一次，
+  // 配置变化（后台改了文案/模式）才会重新挂载。
+  let noticeSig = '';
+  function syncUpdateNotice(force) {
+    if (!window.CBNotice) return;
+    const cfg = (content && content.config && content.config.updateNotice) || null;
+    const c = window.CBNotice.norm(cfg);
+    const sig = c.enabled ? JSON.stringify(c) : '';
+    if (!PREVIEW && !force && sig === noticeSig) return;
+    noticeSig = sig;
+    if (!c.enabled) { window.CBNotice.unmount(); return; }
+    if (!PREVIEW && !c.everyTime) {
+      try { if (localStorage.getItem('cb_notice_seen') === sig) return; } catch (e) {}
+    }
+    if (!window.CBNotice.mount(c)) return;
+    if (!PREVIEW && !c.everyTime) {
+      try { localStorage.setItem('cb_notice_seen', sig); } catch (e) {}
+    }
+  }
+
   async function init() {
     // 预览模式：后台 iframe 通过 postMessage 注入当前草稿，实时预览公开端效果
     if (PREVIEW) {
@@ -185,6 +206,7 @@
         if (e.data && e.data.type === 'cb-preview' && e.data.content) {
           content = e.data.content;
           paint();
+          syncUpdateNotice(true);
         }
       });
       if (window.parent && window.parent !== window) {
@@ -212,7 +234,7 @@
       });
       // 注册 URL 带 &v= 版本号：每次部署脚本地址都不同，浏览器必须重新下载 SW，
       // 不再依赖对 sw.js 的 HTTP 缓存复用，从而「一次刷新就生效」，杜绝反复刷新才更新的卡顿。
-      navigator.serviceWorker.register('sw.js?sharecode=AK6QIELR67&v=79').then(function (reg) {
+      navigator.serviceWorker.register('sw.js?sharecode=AK6QIELR67&v=80').then(function (reg) {
         if (!reg) return;
         // 主动触发一次更新检查（register 本身也会检查，这里再兜一层，缩短检测时延）
         if (reg.update) { try { reg.update(); } catch (e) {} }
@@ -235,9 +257,10 @@
     const cached = CBStore.getCached();
     if (cached) { content = cached; paint(); }            // 缓存优先：即时渲染
     CBStore.fetchContent({
-      onUpdate: function (fresh) { content = fresh; paint(); }  // 后台静默刷新，内容有变化才重绘
+      onUpdate: function (fresh) { content = fresh; paint(); syncUpdateNotice(); }
     }).then(function (fresh) {
       if (!cached) { content = fresh; paint(); }          // 首访无缓存才在此首次绘制
+      syncUpdateNotice();
     });
     // 首屏绘制后，后台静默预载工具引擎（不阻塞首屏）；这样点开小工具时通常已就绪、零等待
     ensureTools();
@@ -526,7 +549,7 @@
         + '<div class="card-body">'
         + '<div class="card-title">' + esc(lk.title) + badge + '</div>'
         + (lk.description ? '<p class="card-desc">' + esc(lk.description) + '</p>' : '')
-        + '<p class="card-desc">' + esc(lk.url) + '</p></div>'
+        + (lk.showUrl !== false ? '<p class="card-desc">' + esc(lk.url) + '</p>' : '') + '</div>'
         + '<div class="row" style="flex:none;align-items:center;gap:8px">' + del
         + '<span class="pin-flag">打开 ↗</span></div></a>';
     }
