@@ -13,11 +13,15 @@ sharecode】的链接。本工具把项目里写死的原链接标识一次性�
   2) host 全局替换（content.json 的 5 处 URL、js/app.js 的 aboutQrUrl、
      js/admin.js 的 PUBLIC_ORIGIN）；
   3) 复用 externalize_images.py --sharecode 重签 18 处外置图片路径；
-  4) 升 SW 壳版本（sw.js CACHE + app.js 注册 `&v=` + meta.json 三处同号）。
+  4) 升 SW 壳版本（sw.js CACHE + app.js 注册 `&v=` + meta.json 三处同号）；
+  5) 把 USE_GITHUB_SYNC 改回 true，恢复「覆盖仓库 content.json 即同步」的旧玩法
+     （store.js 与 guide.html 两处开关）；并在 --apply 时自动 git 提交并推送 GitHub，
+     让【新链接】直接成为「覆盖仓库即发布」的内容源（旧链接已解耦，不受影响）。
 
 ⚠️ 安全约束
   - 默认 --dry-run，绝不写任何文件。
-  - 本工具【绝不发布 / 部署】。发布是人工在用户明确授权后由助理单独执行的步骤。
+  - 本工具【绝不发布 / 部署】，但 --apply 会 git 提交并推送 GitHub（仅绑定内容源，
+    不涉及部署）。用 --no-push 可跳过推送。发布仍需人工在用户明确授权后由助理单独执行。
   - 所有改动都在 git 跟踪内，任何失误都可 `git checkout -- .` 回滚。
   - 自检不通过时打印 FAIL 并给出回滚命令，但不会自动部署。
 
@@ -138,6 +142,22 @@ def run_externalize(new_sc, apply):
     return r.returncode == 0
 
 
+def rebind_github():
+    """把 USE_GITHUB_SYNC 改回 true，恢复「覆盖仓库 content.json 即同步」的玩法（新链接用）。
+    把解耦后的旧链接仓库，重新变成【绑定 GitHub、覆盖仓库即发布】的新链接内容源。"""
+    changed = []
+    for rel in ['js/store.js', 'guide.html']:
+        p = ROOT / rel
+        if not p.is_file():
+            continue
+        t = read_text(p)
+        nt = re.sub(r'USE_GITHUB_SYNC\s*=\s*false', 'USE_GITHUB_SYNC = true', t)
+        if nt != t:
+            write_text(p, nt)
+            changed.append(rel)
+    return changed
+
+
 def validate(new_host, new_sc):
     """自检：残留旧标识、content.json 合法、图片齐全、SW 一致。返回 (ok, lines)。"""
     lines = []
@@ -233,6 +253,8 @@ def main():
     g.add_argument('--dry-run', action='store_true', help='只预览，不写文件（默认）')
     g.add_argument('--apply', action='store_true', help='实际替换（仍不发布）')
     g.add_argument('--check', action='store_true', help='只做自检，不写文件')
+    p.add_argument('--no-push', action='store_true',
+                   help='迁移后不自动 git 提交/推送 GitHub（默认会推送，使新链接成为「覆盖仓库即发布」源）')
     args = p.parse_args()
 
     mode = 'check' if args.check else ('apply' if args.apply else 'dry-run')
@@ -295,18 +317,34 @@ def main():
         if ch:
             print('  ✓ SW 升壳: ' + ', '.join(ch) + ' -> contentbox-v%d' % nxt)
 
-    print('\n共替换 %d 处。开始自检...' % total)
+    print('\n共替换 %d 处。重新绑定 GitHub 同步...' % total)
+    rb = rebind_github()
+    if rb:
+        print('  ✓ 重新绑定 GitHub 同步: ' + ', '.join(rb) + ' (USE_GITHUB_SYNC=true)')
+
     ok, lines = validate(args.new_host, args.new_sharecode)
     for l in lines:
         print(l)
 
     print('\n' + ('=' * 64))
     if ok:
-        print('替换完成且自检 PASS ✅')
+        print('替换 + 重绑 GitHub 完成且自检 PASS ✅')
+        if args.no_push:
+            print('（--no-push：未推 GitHub。手动执行 git add -A && git commit && git push origin main）')
+        else:
+            print('--- 绑定 GitHub：提交并推送（使新链接成为「覆盖仓库即发布」源）---')
+            try:
+                subprocess.run(['git', 'add', '-A'], check=True, cwd=str(ROOT))
+                subprocess.run(['git', 'commit', '-m',
+                                '迁移到新链接 %s（已重绑 GitHub 同步）' % args.new_host],
+                               check=True, cwd=str(ROOT))
+                subprocess.run(['git', 'push', 'origin', 'main'], check=True, cwd=str(ROOT))
+                print('  ✓ 已推送 GitHub：以后覆盖仓库 content.json 即可同步新链接')
+            except subprocess.CalledProcessError as e:
+                print('  ✗ git 提交/推送失败：%s（可手动补推，不影响本地替换）' % e)
         print('下一步（由助理执行，本工具不发布）：')
-        print('  1) git add -A && git commit -m "迁移到新链接 <host>"')
-        print('  2) 把 assets/ 与原链接一样部署上线（图片必须随项目部署）')
-        print('  3) ⚠️ 在用户明确同意【上线新链接】之前，不得 userAskedToPublish=true')
+        print('  1) 把 assets/ 与原链接一样部署上线（图片必须随项目部署）')
+        print('  2) ⚠️ 在用户明确同意【上线新链接】之前，不得 userAskedToPublish=true')
     else:
         print('替换完成但自检 FAIL ❌')
         print('请勿发布！先排查上面对勾处，或回滚：git checkout -- .')

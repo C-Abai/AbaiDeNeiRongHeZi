@@ -94,6 +94,9 @@
       })();
       var LOCAL = './content.json?sharecode=' + encodeURIComponent(SC);
       var RAW = 'https://raw.githubusercontent.com/C-Abai/AbaiDeNeiRongHeZi/refs/heads/main/content.json';
+      // 【解耦开关】旧链接已脱离 GitHub：置 false 关闭安装页后台 GitHub 校验；
+      // 迁移工具 migrate_to_new_link.py 改回 true 即恢复「覆盖仓库即同步 apkUrl/引导文案」。
+      var USE_GITHUB_SYNC = false;
       var CACHE_KEY = 'cb_guide_cache_v1';
       var LEN_KEY = 'cb_guide_len_v1';
       var card = document.getElementById('card');
@@ -211,7 +214,7 @@
             if (left > 0) setTimeout(function () { attempt(left - 1); }, 2000);
           });
         }
-        attempt(1);
+        if (USE_GITHUB_SYNC) attempt(1);
         // 同域快渲染；GitHub 新版若已先落地，忽略随后到达的托管旧快照，避免内容被冲回旧版。
         loadJson(LOCAL, 6000)
           .then(function (data) {

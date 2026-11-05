@@ -17,6 +17,10 @@
   const DRAFT_KEY = 'cb_admin_draft_v1';
 
   const GITHUB_CONTENT_URL = 'https://raw.githubusercontent.com/C-Abai/AbaiDeNeiRongHeZi/refs/heads/main/content.json';
+  // 【解耦开关】旧链接已脱离 GitHub：置 false 后不再向 GitHub 拉取全量内容，
+  // 只读取本托管端部署的 ./content.json 快照（首屏秒开仍由 refreshFromLocal 保证）。
+  // 新链接迁移工具 migrate_to_new_link.py 会把它改回 true，恢复「覆盖仓库 content.json 即同步」的玩法。
+  const USE_GITHUB_SYNC = false;
   const LOCAL_MS = 6000;       // 同域请求超时上限（正常网络毫秒级返回）
   const REMOTE_MS = 2500;      // 首屏兜底用的短超时（快速失败，绝不拖住首屏 / 登录）
   const REMOTE_FULL_MS = 45000;// 【v86】GitHub 全量 1.28MB 跨境实测：无压缩 24.6s、gzip 11s，
@@ -155,7 +159,7 @@
     // 本次启动的会话状态：GitHub 新内容一旦生效，就别让稍后返回的托管旧快照把它覆盖回去
     const ctx = { ghApplied: false };
     refreshFromLocal(opts, ctx);
-    crossCheckGithub(opts, ctx);
+    if (USE_GITHUB_SYNC) crossCheckGithub(opts, ctx);
     if (cached) return cached;
     // 首次访问无缓存：等同域（8s 超时）→ GitHub raw（2.5s 超时）→ 种子内容
     try { const d = await fetchJsonT(CONTENT_URL, 8000); cacheSet(d); return d; } catch (e) {}
