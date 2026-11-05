@@ -21,7 +21,7 @@
   - 若 github.com 访问超时/502，改用 tarball：
     https://codeload.github.com/C-Abai/AbaiDeNeiRongHeZi/tarball/refs/heads/main
   - 若上述均被网络拦截，用 GitHub REST API（git/trees + git/blobs）拉取全部文件。
-- 克隆后先阅读根目录 HANDOVER.md（已到 v69，含 §5c 完整上下文）。
+- 克隆后先阅读根目录 HANDOVER.md（含 §5c / §5d 完整上下文）。
 
 ================================================================
 ## 2. 确定 WorkBuddy 会话根目录（关键！）
@@ -120,10 +120,12 @@ applications:
      哪个会话根放哪个 appId 的 genie，就覆盖哪个链接。
    - 一个工作区/会话只能有一个 app 链接。要同时维护新旧两个链接，需开**两个 WorkBuddy 任务窗口**，
      分别放旧 appId 与新 appId 的 genie。
-   - 旧链接不下线时仍可改内容：内容层**只需把 content.json 覆盖到 GitHub**（v85 起已取消
-     meta.json 指纹门槛，公开端每次启动后台校验 GitHub 全量内容）；更稳是再重新部署一次旧 appId。
-     界面 / 代码层只能重新部署旧 appId；旧 APK 内硬编码的 host 无法远程改，只能重新打包。
-     注意新旧链接共用同一份 GitHub content.json，覆盖一次两边访客都会变。
+   - **旧链接已解耦 GitHub**（自 1ea3f0a 起 `USE_GITHUB_SYNC=false`）：它只读自己部署的快照，
+     往 GitHub 覆盖 content.json **不会**再影响旧链接访客。旧链接改内容 = 用解耦版重新部署旧 appId；
+     日常普通更新仍可进原链接后台改完发布（后台本就不读 GitHub）。
+   - 若走路径二生成新链接：迁移工具 `migrate_to_new_link.py` 会把【新链接】的 `USE_GITHUB_SYNC`
+     改回 true 并推送 GitHub，届时「覆盖仓库 content.json」只同步【新链接】，与旧链接互不影响。
+   - 界面 / 代码层改动只能重新部署对应 appId；旧 APK 内硬编码 host 无法远程改，只能重新打包。
    - **v87 起 content.json 已瘦到约 20KB**（18 处图片外置到 `assets/img-*.jpg`，17 张图约 927KB）。
      clone 或下载部署包时**务必确认 `assets/` 目录一起带上**，否则所有封面 / 壁纸 / 图标 404。
      图片路径里写死了 `?sharecode=AK6QIELR67`，迁移到新链接时用
