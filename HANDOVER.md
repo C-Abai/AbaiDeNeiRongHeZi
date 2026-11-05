@@ -330,4 +330,18 @@ git diff --stat HEAD origin/main                   # 其他文件差异摘要
 - **验证**：本地用 vm 模拟「GitHub raw 永久挂起」→ 首屏 1ms 返回缓存、500ms 内 `onUpdate` 把 v66 刷成最新 ✅；线上 sw=v79 / `&v=79` / `meta.json contentHash=v79-sync-20261104-1905`；同域 `content.json?sharecode=...&_h=` 200 且 0.55s、后台同域请求 0.52s、引导页 0.24s；三端 content.json 一致（8 篇、v76 文案、guide 已启用、apkUrl 指向引导页）。已推 GitHub 并重部署（appId 不变，链接不变）。
 - **注意**：用户浏览器里若仍是 v78 旧 SW，第一次打开会自动 reload 一次接管 v79；localStorage 里的 v66 旧缓存会在新版 store.js 首次加载后被同域最新内容覆盖并自动重绘，无需手动清站点数据。
 
+## 2026-11-05 补充：快捷方式网址开关 + 强制提示更新弹窗（v80）
+
+- **需求**：① 后台「工具栏 → 添加快捷方式」增加「是否在公开端展示网址」开关，已添加项在编辑里也能改；② 新增「进入网站 / 手机 APP 首页即弹出」的更新提示，设置放在「站点设置」下并做成**折叠卡片**（后台项太多）；支持强制全屏 / 左上角气泡（带关闭）、可编辑主题 / 文本 / 图标 / 引导按钮；同步适配公开端、后台设置、预览、浅色与暗调。
+- **数据结构**：
+  - `config.links[].showUrl`（布尔，**缺省 = 显示**，兼容线上原有 8 条无该字段的数据）。后台三处：添加表单 `#lk_showurl`、编辑弹窗 `#l_showurl`、列表卡片 `data-toggle-url` 一键切换（事件委托挂在 `panel._lDelegated` 上，重渲染不失效）。公开端 `js/app.js` 的 `linkCard()` 用 `lk.showUrl !== false` 决定是否输出网址行。
+  - `config.updateNotice`（对象，**缺省 = 不弹**）：`{ enabled, mode:'fullscreen'|'bubble', theme:'auto'|'light'|'dark', accent, title, text, icon, buttonText, buttonUrl, everyTime }`。全屏 = 居中遮罩、默认无关闭按钮；**未填 `buttonUrl` 时自动补关闭按钮，防止把访客锁死**。气泡 = 左上角 fixed 卡片、必带关闭按钮。
+- **共享模块 `js/notice.js`**：挂 `window.CBNotice`（`norm / html / mount / unmount`），由 `index.html`、`preview.html`、`admin.html` 三页共同引入（必须在 `app.js` / `admin.js` 之前）。`html(cfg, opts)` 的 `opts.inline` 产出后台缩小预览（不产生 fixed 浮层）、`opts.preview` 让按钮 disabled 且强制带关闭、`opts.force` 允许 enabled=false 时也渲染。SW 的 `ASSETS` 与 `isShellUrl` 已纳入该文件。
+- **后台设置**：`renderSettings()` 复用现成的 `collBlock('notice', ...)` 折叠组（状态存 `localStorage['cb_admin_coll_notice']`，默认收纳）。字段 id 统一 `n_*`；`syncNoticeDraft(applyToContent)` 输入即更新 `#n_mini` 小预览并 `pushPreview()` 推到预览 iframe；初始化传 `false` 只画预览、不误写草稿；「👁 在后台全屏预览」直接 `CBNotice.mount(..., {force:true, preview:true})`；`#s_save` 收集写入 `content.config.updateNotice`。
+- **公开端 / 预览**：`js/app.js` 新增模块级 `syncUpdateNotice(force)`。正常模式同一配置只处理一次（`noticeSig` guard），`everyTime=false` 时按配置签名存 `localStorage['cb_notice_seen']`，配置改动会再弹一次；`onUpdate` 与 `fetchContent().then()` 都会调用，保证冷启动与内容刷新后都能拿到最新配置。**预览模式的 `PREVIEW` 分支会 `return`，必须在该分支的 `cb-preview` 回调里单独调一次 `syncUpdateNotice(true)`**，否则后台「👁 预览」里永远看不到弹窗。
+- **主题适配**：CSS 新增 `.upd-mask / .upd-full / .upd-bubble / .upd-card / .upd-icon / .upd-title / .upd-text / .upd-btn / .upd-close`，`auto` 靠 `body.dim .upd-mask.upd-auto .upd-card` 跟随浅色/暗调，`light`/`dark` 强制覆盖；后台 mini 预览另有 `body.admin-dark .upd-inline-preview.upd-auto` 规则。强调色用卡片上的内联 `--upd-accent`。
+- **版本**：SW `contentbox-v80`，`js/app.js` 注册 `&v=80`，`meta.json` 的 `sw` 同步；`contentHash` 故意**未改**（content.json 未变，避免全设备无谓重拉 1.28MB）。
+- **验证**：5 个 JS 文件 `node --check` 全过、CSS 括号平衡；用 vm 模拟 DOM 跑 `CBNotice` 18 项边界测试全过（全屏防锁死、XSS 转义、非法链接丢弃、inline 预览不产生浮层等）；后台表单 `n_*` id 与代码引用完全一致；线上 sw=v80 / `&v=80` / `js/notice.js` 200 / 三页均引入 / 后台双参数地址 200 / content.json 三端一致。提交 `e70c342` 已推 GitHub 并重新部署（appId 与链接不变）。
+- **⚠️ 上线生效路径**：弹窗**默认关闭**，`content.json` 里没有 `updateNotice` 字段。后台「保存设置」只写本机草稿，此时「👁 预览」和「👁 在后台全屏预览」能立刻看到效果；**要让所有访客 / 手机 APP 真正弹出，必须走「发布」tab 推上线（需 PAT），或让助手把配置同步进 content.json 后重新部署**。
+
 *本手册由助手在 v69 发布后整理并更新，作为跨设备恢复上下文使用。*
