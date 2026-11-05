@@ -1,5 +1,9 @@
 (function (global) {
-  // 数据层：同域 content.json 为权威数据源（国内快且稳），GitHub raw 仅作异步补充校验。
+  // 数据层：同域 content.json 用于首屏秒开，GitHub raw 每次启动后台校验一次全量内容。
+  // 【v85 核心修复】恢复「只把 content.json 覆盖到 GitHub 就能同步公开端」的能力：
+  // v79~v84 靠两端 meta.json 的 contentHash 差异决定是否拉全量，而手动覆盖 content.json
+  // 不会改 meta.json → 指纹相同直接跳过；即便触发，全量只给 3s 超时，1.28MB 跨境基本拉不完。
+  // 现在改为无条件异步校验 + 长超时 + 条件请求，内容真变了才写缓存重绘，首屏仍零等待。
   // 【v79 关键修复】托管平台所有静态资源必须带 sharecode 门禁参数，否则返回「链接不完整」HTML，
   // 旧版 './content.json' / './meta.json' 不带门禁 → 所有同域兜底请求其实都拿到 HTML 而静默失败。
   const SC = (function () {
@@ -8,15 +12,15 @@
   })();
   function gate(u) { return u + (u.indexOf('?') >= 0 ? '&' : '?') + 'sharecode=' + encodeURIComponent(SC); }
   const CONTENT_URL = gate('./content.json');
-  const META_URL = gate('./meta.json');
   const CACHE_KEY = 'cb_content_cache_v1';
   const CACHE_HASH_KEY = 'cb_content_hash_v1';
   const DRAFT_KEY = 'cb_admin_draft_v1';
 
   const GITHUB_CONTENT_URL = 'https://raw.githubusercontent.com/C-Abai/AbaiDeNeiRongHeZi/refs/heads/main/content.json';
-  const GITHUB_META_URL = 'https://raw.githubusercontent.com/C-Abai/AbaiDeNeiRongHeZi/refs/heads/main/meta.json';
-  const LOCAL_MS = 6000;   // 同域请求超时上限（仅兜底，正常网络毫秒级返回）
-  const REMOTE_MS = 2500;  // GitHub raw 跨境超时（快速失败，绝不允许拖住首屏 / 登录）
+  const LOCAL_MS = 6000;       // 同域请求超时上限（正常网络毫秒级返回）
+  const REMOTE_MS = 2500;      // 首屏兜底用的短超时（快速失败，绝不拖住首屏 / 登录）
+  const REMOTE_FULL_MS = 20000;// 【v85】GitHub 全量 1.28MB 跨境实测可达 20s+；
+                               // 但这条链路纯后台 fire-and-forget，给足时间也不影响首屏秒开。
 
   function withBust(url) { return url + (url.indexOf('?') >= 0 ? '&' : '?') + '_h=' + Date.now(); }
 
@@ -42,11 +46,25 @@
     return d;
   }
 
-  // meta.json 是 {contentHash, sw}，没有 config 字段，不能走带内容校验的 fetchJsonT
-  async function fetchMetaT(url, ms) {
-    const r = await fetchT(withBust(url), { cache: 'no-store' }, ms);
-    if (!r.ok) throw new Error('HTTP ' + r.status);
-    return await r.json();
+  // 【v85】直接拉 GitHub 全量内容，不再依赖 meta.json 指纹。
+  // 固定 URL + cache:'no-cache' 触发浏览器条件请求（If-None-Match / 304）：内容没变时
+  // 只有一次轻量往返、几乎不耗流量；超时覆盖到 body 读完（fetchT 只覆盖到响应头）。
+  // 本函数永远不出现在首屏 / 登录的 await 链路上。
+  function fetchGithubContent(ms) {
+    return new Promise(function (resolve, reject) {
+      const ctl = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+      const timer = setTimeout(function () { if (ctl) ctl.abort(); reject(new Error('timeout')); }, ms);
+      const o = { cache: 'no-cache' };
+      if (ctl) o.signal = ctl.signal;
+      fetch(GITHUB_CONTENT_URL, o).then(function (r) {
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        return r.json();
+      }).then(function (d) {
+        clearTimeout(timer);
+        if (!d || typeof d !== 'object' || !d.config) throw new Error('bad payload');
+        resolve(d);
+      }).catch(function (e) { clearTimeout(timer); reject(e); });
+    });
   }
 
   function cacheSet(d) { try { localStorage.setItem(CACHE_KEY, JSON.stringify(d)); } catch (e) {} }
@@ -126,58 +144,58 @@
     } catch (e) { return null; }
   }
 
-  // 公开端：有缓存立即返回（首屏零等待、不白屏），同时【每次启动都强制】向同域取一次最新内容，
-  // 拿到即比对、写入缓存并回调重绘。不再依赖「指纹比对成功才更新」——旧版指纹链路被
-  // GitHub raw 的无超时 HEAD 请求卡死，内容永远停在 v66，只能反复刷新碰运气。
+  // 公开端：有缓存立即返回（首屏零等待、不白屏），同时后台并行跑两条刷新链路：
+  // ① 同域 content.json（快、稳，用于托管端已部署的内容）
+  // ② GitHub 全量内容（慢，但保证「只覆盖仓库 content.json」也能同步）
+  // 两条都不参与首屏 await，谁拉到新内容谁重绘；GitHub 优先，避免被稍后到达的旧快照冲掉。
   async function fetchContent(opts) {
     opts = opts || {};
     const cached = getCached();
-    // 后台并行刷新，不阻塞首屏；两条链路都带超时，绝不挂死
-    refreshFromLocal(opts);
-    crossCheckGithub(opts);
+    // 本次启动的会话状态：GitHub 新内容一旦生效，就别让稍后返回的托管旧快照把它覆盖回去
+    const ctx = { ghApplied: false };
+    refreshFromLocal(opts, ctx);
+    crossCheckGithub(opts, ctx);
     if (cached) return cached;
-    // 首次访问无缓存：等同域（4s 超时）→ GitHub raw（2.5s 超时）→ 种子内容
+    // 首次访问无缓存：等同域（8s 超时）→ GitHub raw（2.5s 超时）→ 种子内容
     try { const d = await fetchJsonT(CONTENT_URL, 8000); cacheSet(d); return d; } catch (e) {}
-    try { const d = await fetchJsonT(GITHUB_CONTENT_URL, REMOTE_MS); cacheSet(d); return d; } catch (e) {}
+    try { const d = await fetchGithubContent(REMOTE_MS); cacheSet(d); return d; } catch (e) {}
     return seed();
   }
 
-  // 内容确有变化才写缓存 + 重绘，避免无谓的界面抖动
-  function applyFresh(fresh, opts) {
+  // 内容确有变化才写缓存 + 重绘，避免无谓的界面抖动。
+  // ctx/src 是来源优先级：两条链路并行时，GitHub 版生效后忽略随后到达的托管旧快照，
+  // 否则「谁最后返回谁覆盖」，刚同步的新内容会被部署快照冲回去。
+  function applyFresh(fresh, opts, ctx, src) {
     if (!fresh) return;
     let s;
     try { s = JSON.stringify(fresh); } catch (e) { return; }
-    if (s === cacheStr()) return;
+    if (ctx && ctx.ghApplied && src !== 'github') return;
+    if (s === cacheStr()) {
+      if (src === 'github' && ctx) ctx.ghApplied = true;
+      return;
+    }
     cacheSet(fresh);
-    try { localStorage.setItem(CACHE_HASH_KEY, 'v79-' + s.length); } catch (e) {}
+    try { localStorage.setItem(CACHE_HASH_KEY, 'v85-' + s.length); } catch (e) {}
+    if (src === 'github' && ctx) ctx.ghApplied = true;
     if (opts && opts.onUpdate) opts.onUpdate(fresh);
   }
 
-  // 同域权威刷新：每次打开必拉一次；同域失败才退到 GitHub raw（同样带超时）
-  function refreshFromLocal(opts) {
+  // 同域刷新：每次打开必拉一次（毫秒级）。失败就静默忽略，不拖累首屏；
+  // GitHub 全量校验统一由 crossCheckGithub 负责，避免同一时刻发两条重复的大请求。
+  function refreshFromLocal(opts, ctx) {
     fetchJsonT(CONTENT_URL, LOCAL_MS)
-      .then(function (fresh) { applyFresh(fresh, opts); })
-      .catch(function () {
-        fetchJsonT(GITHUB_CONTENT_URL, REMOTE_MS)
-          .then(function (fresh) { applyFresh(fresh, opts); })
-          .catch(function () {});
-      });
+      .then(function (fresh) { applyFresh(fresh, opts, ctx, 'local'); })
+      .catch(function () {});
   }
 
-  // 纯异步补充：若用户/后台只改了 GitHub（托管端尚未重新部署），用 meta.json 指纹差异纠正。
-  // 不参与首屏等待；GitHub 不可达时静默忽略，同域内容照常可用。
-  function crossCheckGithub(opts) {
-    Promise.all([
-      fetchMetaT(GITHUB_META_URL, REMOTE_MS).catch(function () { return null; }),
-      fetchMetaT(META_URL, 1500).catch(function () { return null; })
-    ]).then(function (a) {
-      const gh = a[0] && a[0].contentHash;
-      const lo = a[1] && a[1].contentHash;
-      if (!gh || !lo || gh === lo) return null;   // 两端一致或读不到，不浪费流量
-      return fetchJsonT(GITHUB_CONTENT_URL, 3000);
-    }).then(function (fresh) {
-      if (fresh) applyFresh(fresh, opts);
-    }).catch(function () {});
+  // 【v85 修复点】纯异步补充校验：每次启动都向 GitHub 取一次全量内容，
+  // 内容确有变化才写缓存 + 重绘。不再比对 meta.json 指纹 ——
+  // 手动覆盖仓库 content.json 时用户不会去改 meta.json，旧逻辑会直接跳过、内容永远不更新。
+  // 不参与首屏 await；GitHub 不可达 / 超时时静默忽略，同域内容照常可用。
+  function crossCheckGithub(opts, ctx) {
+    fetchGithubContent(REMOTE_FULL_MS)
+      .then(function (fresh) { applyFresh(fresh, opts, ctx, 'github'); })
+      .catch(function () {});
   }
 
   function safeParse(s) {

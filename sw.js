@@ -1,4 +1,4 @@
-const CACHE = 'contentbox-v83';
+const CACHE = 'contentbox-v84';
 const SC = 'AK6QIELR67';
 const ASSETS = [
   './index.html?sharecode=' + SC,
@@ -68,9 +68,10 @@ function netFirst(event) {
     .catch(() => caches.open(CACHE).then((c) => c.match(event.request)));
 }
 
-// 缓存优先（即时返回）+ 后台静默刷新：壳与 content.json 走这条，重开即秒开、无网络往返。
-// 应用数据层（store.js）已用 meta.json 指纹判断是否需要真正拉取全量，未变化时不触发下载，
-// 所以此处即便从 SW 缓存即时返回旧壳/旧内容也安全——只有发布且指纹变化才会绕过缓存取新。
+// 缓存优先（即时返回）+ 后台静默刷新：应用外壳走这条，重开即秒开、无网络往返。
+// 【v85】数据层 store.js 已改为每次启动后台无条件校验 GitHub 全量内容（不再依赖 meta.json
+// 指纹），内容有变化就 onUpdate 重绘；所以壳从缓存秒开是安全的，内容不会被旧部署快照锁死。
+// content.json / meta.json 在下方 fetch 分支里被完全放行、不进 SW 缓存。
 function staleWhileRevalidate(event) {
   const req = event.request;
   return caches.open(CACHE).then((cache) =>

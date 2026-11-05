@@ -24,23 +24,27 @@
 
 ## 1. 数据到底从哪来？（核心架构，务必先读）
 
-**关键结论（v79 重构后）：线上内容以「当前链接托管的 `./content.json`」为权威，GitHub raw 只作异步补充校验。**
+**关键结论（v85 起）：首屏用「当前链接托管的 `./content.json`」秒开，同时每次启动后台无条件校验一次 GitHub 全量内容，谁新用谁。**
 
 - 站点 `js/store.js`：`CONTENT_URL = './content.json?sharecode=...'`（同域），每次启动必拉一次，
-  带 6s 超时；拿到即写缓存并 `onUpdate` 重绘，**不参与指纹判定**。
-- `crossCheckGithub()` 异步比对 GitHub raw 与同域 `meta.json` 的 `contentHash`：
-  **两端不同**才拉 GitHub 全量 `content.json` 覆盖；两端相同 / GitHub 读不到（2.5–3s 超时）就跳过。
+  带 6s 超时；拿到即写缓存并 `onUpdate` 重绘。
+- `crossCheckGithub()`（v85 重写）：**不再读 `meta.json` 指纹**，每次启动都向 GitHub raw 取一次
+  全量 `content.json`（固定 URL + `cache:'no-cache'` 条件请求，内容未变时 304、几乎不耗流量；
+  超时 20s 且覆盖到 body 读完），内容确有变化才写缓存 + 重绘。
+  - 全程 **fire-and-forget**，不出现在首屏 / 登录的 await 链路上；GitHub 不可达时静默忽略。
+  - 来源优先级：GitHub 新内容一旦生效，忽略随后到达的托管旧快照，避免被旧部署快照冲回去。
+- `guide.html` 引导页也加了同一条后台校验（v85），所以 `apkUrl` / 引导文案同样能靠覆盖仓库更新。
 - 首次访问无缓存：同域（8s）→ GitHub raw（2.5s）→ 内置种子内容，故断网也能开。
 - ⚠️ 托管平台**所有静态资源必须带 `sharecode` 门禁参数**，否则返回「链接不完整」HTML/403；
   `store.js` 的 `gate()` 会自动补。`content.json` / `meta.json` / `guide.html` 由 SW 完全放行、不缓存。
-- ⚠️ **改 GitHub 内容必须同时改 `meta.json` 的 `contentHash`**，否则两端指纹相同，公开端不会拉取。
-  后台「保存即发布」（配 PAT 后）会自动同步改指纹；手动在 GitHub 覆盖 content.json 时别漏。
-- 托管平台的 `./content.json` **不会**随浏览器/GitHub 发布而变，只有助手重新部署才更新。
-  两者长期不一致时以同域为准，GitHub 仅纠正差异；跨境超时则访客仍看到托管旧内容。
+- ✅ **只把 `content.json` 覆盖到 GitHub 仓库就能同步公开端，不用改 `meta.json`、不用重新部署。**
+  `meta.json` 的 `contentHash` 现在只是后台发布时写的兼容字段（旧版客户端仍读它），已不参与判定。
+- 托管平台的 `./content.json` **不会**随 GitHub 发布而变，只有助手重新部署才更新；
+  v85 起 GitHub 版更新后会在客户端覆盖它，故两边长期不一致也不影响同步。
 
-> 一句话记住：**改内容 = 改 GitHub 的 `content.json` + 改 `meta.json` 指纹（或让助手重新部署）；
-> 改代码 / 界面 = 改项目文件再部署。**
-> （本节为 v79 后架构；早期 v61 版「GitHub raw 为权威、无需改 meta.json」的说法已作废。）
+> 一句话记住：**改内容 = 把 `content.json` 覆盖到 GitHub（单个文件即可）；改代码 / 界面 = 改项目文件再部署。**
+> （v79~v84 曾要求「同时改 `meta.json.contentHash` 指纹」，v85 已取消该门槛；
+> 更早的 v61 版「GitHub raw 为权威、首屏硬等 1.28MB」也别照搬——首屏现在零等待。）
 
 ---
 
@@ -108,18 +112,18 @@ git diff --stat HEAD origin/main                   # 其他文件差异摘要
 
 ## 4. 日常改内容（最常用，换不换电脑都行）
 
-**改 `content.json` 推到 GitHub 即可，无需重部署 —— 但必须同时改 `meta.json` 的 `contentHash`。**
+**把 `content.json` 覆盖到 GitHub 仓库即可同步公开端，无需重部署、无需改 `meta.json`。**
 
-- 方法①：GitHub 网页覆盖 `content.json` → **再把 `meta.json` 的 `contentHash` 改成任意新值** → 提交。
-- 方法②：开后台（双参数地址见 §0）编辑 → 「发布」tab 配置 PAT 后自动发布（后台会自动同步改指纹）；
-  未配 PAT 则导出 `content.json` 让助手推上线（助手会同时改指纹）。
-- 原理（v79 重构后，以 `js/store.js` 为准）：公开端以**同域 `./content.json` 为权威**，每次启动必拉；
-  GitHub raw 只在「GitHub 的 `meta.json.contentHash` ≠ 同域 `meta.json.contentHash`」时才异步拉全量覆盖。
-  **两端指纹相同 → 直接跳过，只改 GitHub 内容不会生效**（早期文档这里写漏了）。
-- 改完在手机上**杀掉 PWA 后台进程重进**（或强刷），新内容即生效。
-- ⚠️ 只推 GitHub、不重部署时，托管平台的 `./content.json` 仍是旧版。GitHub raw 跨境有 2.5s 超时，
-  且「同域权威刷新」与「GitHub 补充」可能互相覆盖。要给**所有**访客强推公告（如迁移通知），
-  最稳是重新部署一次对应 appId（见 §5d）。
+- 方法①（最常用）：GitHub 网页打开 `content.json` → 上传/编辑覆盖 → 提交，**只选这一个文件**。
+- 方法②：开后台（双参数地址见 §0）编辑 → 「发布」tab 配置 PAT 后自动发布；
+  未配 PAT 则导出 `content.json` 手动覆盖到仓库，或让助手推上线。
+- 原理（v85）：公开端与引导页每次启动都在后台向 GitHub raw 取一次全量内容，与本地缓存比对，
+  不同就写缓存 + 重绘；`meta.json` 指纹**不再参与判定**。首屏仍由同域 / 本地缓存秒开，
+  GitHub 拉得慢也不会白屏。
+- 生效时机：文件推上去后，访客**下次打开 App** 开始校验；跨境慢时可能要等几秒才自动刷新，
+  没等到就**再重开一次**即新内容（已写入 localStorage 缓存）。
+- ⚠️ 只推 GitHub、不重部署时，托管平台的 `./content.json` 仍是旧版。要给**所有**访客强推公告
+  （如迁移通知），最稳仍是重新部署一次对应 appId（见 §5d），把公告版写进托管快照。
 
 ⚠️ **致命坑（务必记住）**：GitHub 网页「覆盖上传」时，**只选 `content.json` 一个文件**。
 千万别把 `css/style.css`、`js/app.js`、`sw.js`、`meta.json` 也一起传上去——
@@ -228,7 +232,7 @@ git diff --stat HEAD origin/main                   # 其他文件差异摘要
 ### 旧链接不下线时，还能改它的内容吗？——能，但分三层
 | 想改的东西 | 能否改 | 怎么做 |
 |---|---|---|
-| 内容（文章 / 链接 / 公告 / `updateNotice` 弹窗 / `apkUrl`） | ✅ 能，不必下线 | 改 GitHub `content.json` + **同步改 `meta.json` 指纹**（见 §4）；更稳是重新部署一次旧 appId |
+| 内容（文章 / 链接 / 公告 / `updateNotice` 弹窗 / `apkUrl`） | ✅ 能，不必下线 | 把 `content.json` 覆盖到 GitHub 即可（v85 起无需改指纹，见 §4）；更稳是再重新部署一次旧 appId |
 | 界面 / 代码（HTML、CSS、JS、SW、后台页） | ✅ 能，但**只能重新部署** | 在另一个会话根放旧 appId 的 genie，从那里部署；改 GitHub 对代码无效 |
 | 旧 APK 里硬编码的地址 | ❌ 改不了 | APK 是 TWA，`host` 写死在打包配置里，只能重新打包新 APK 让用户手动安装 |
 
@@ -239,18 +243,19 @@ git diff --stat HEAD origin/main                   # 其他文件差异摘要
    `buttonText` 改「前往新地址」，`buttonUrl` 指向**新链接的引导页**；
    `config.apkUrl` 改指**新 APK 直链**（新域名 + `/app.apk?sharecode=<新 sharecode>`）；
    `config.author.intro` 的「站点官网」、links 里指向旧域名的条目一并改新域名；再发一篇置顶公告。
-2. 旧链接当前 v83 代码**已支持 `updateNotice` 全屏弹窗**，开启即生效，**无需改代码**。
-   老用户点「一键安装」→ 引导页读 `apkUrl` → 下载新 APK，这条链路可远程改，不需要动旧 APK。
+2. 旧链接当前 v85 代码**已支持 `updateNotice` 全屏弹窗，引导页也已能读 GitHub 新版 `apkUrl`**，
+   开启即生效，**无需改代码**。老用户点「一键安装」→ 引导页读 `apkUrl` → 下载新 APK，
+   这条链路可远程改，不需要动旧 APK。
 3. 让公告覆盖所有旧访客：最稳是**重新部署一次旧 appId**，把公告版 content.json 写进旧链接托管。
-   只推 GitHub 依赖访客能访问 raw（跨境 2.5s 超时），且「同域权威刷新」与「GitHub 补充」
-   可能互相覆盖造成内容抖动。
+   v85 起只推 GitHub 也能同步（20s 后台全量校验 + 来源优先级，不会被旧快照冲掉）；
+   但国内访问 raw 仍可能超时，重新部署可保证 100% 覆盖。
 4. 新链接侧同步部署代码，并按下面清单改完再发布。
 
 ### 切到新链接的代码改动清单（新链接的 sharecode 很可能不同！）
 - `SC` 在 `store.js` / `admin.js` / `guide.html` 中是「优先读 URL 参数，缺省回落 `AK6QIELR67`」，
   故数据请求会自动适配；但以下**写死**处必须全局替换成新域名 + 新 sharecode：
   - `index.html` / `admin.html` / `preview.html` / `download.html` / `manifest.webmanifest` 里所有 `?sharecode=AK6QIELR67`
-  - `js/app.js`：SW 注册 `sw.js?sharecode=...&v=83`、`aboutQrUrl`、`ensureScript` 的 js 路径、
+  - `js/app.js`：SW 注册 `sw.js?sharecode=...&v=84`、`aboutQrUrl`、`ensureScript` 的 js 路径、
     关于页后台入口 `admin-mini`（当前仍是单参数 `admin.html?key=...`，应补 sharecode）
   - `js/admin.js`：`PUBLIC_ORIGIN`、`DEFAULT_INSTALL_URL`、两处预览 iframe URL、`fetch('sw.js?...')`
   - `content.json`：`apkUrl`、`author.intro` 官网、links 里的旧域名、引导页配置里的地址
@@ -266,8 +271,9 @@ git diff --stat HEAD origin/main                   # 其他文件差异摘要
 
 ### 何时下线旧链接
 保留到绝大多数老用户已装新 APK / 已访问新链接之后。旧链接不下线不影响新链接，
-但两者**共用同一个 GitHub `content.json` / `meta.json`**：迁移期请让两边显示同一份迁移版内容，
-或让新链接以自身托管的 content.json 为准（令其本地 `contentHash` 与 GitHub 一致），避免内容互相打架。
+但两者**共用同一个 GitHub `content.json`**：v85 起两边都会被后台全量校验刷成同一份内容，
+迁移期请让两边显示同一份迁移版内容。若必须显示不同内容，只能改新链接的 `store.js`
+（去掉 `crossCheckGithub()` 或换内容源）后再部署，**不能靠 `meta.json` 指纹区分**。
 
 ---
 

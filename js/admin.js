@@ -34,8 +34,9 @@
   let _publishing = false;
   let _pendingData = null;
   // 发布 content.json 后同步更新 GitHub 上 meta.json 的 contentHash。
-  // 公开端靠「指纹比对」决定是否重新拉取内容；只改 content.json 而不改指纹时，
-  // 内容字节数又恰好不变的话，其他设备会一直吃旧缓存、看不到新设置。
+  // 【v85 说明】公开端/引导页已改为每次启动后台无条件校验 GitHub 全量内容，
+  // 不再依赖指纹比对；这一步仅为兼容仍缓存旧版 store.js 的访客而保留。
+  // 失败也不阻断内容发布（catch 内静默忽略），所以「只覆盖 content.json」照样生效。
   async function emitPublishSignal(tok) {
     const headers = { 'Authorization': 'Bearer ' + tok, 'Accept': 'application/vnd.github+json' };
     try {

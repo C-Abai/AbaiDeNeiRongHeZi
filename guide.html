@@ -83,8 +83,11 @@
 
   <script>
     (function () {
-      // 【v79】引导页数据源：同域优先（带门禁参数、国内快且稳），GitHub raw 仅作带超时的兜底。
-      // 旧版每次都硬拉 GitHub raw 的 1.28MB content.json 且没有超时，网络差时整页空等。
+      // 【v79 + v85】引导页数据源：同域优先（带门禁参数、国内快且稳）用于首屏秒开，
+      // 同时后台无条件校验一次 GitHub 全量内容（长超时 + 条件请求，不阻塞首屏）。
+      // v85 修复：旧版只在「同域失败」时才退到 GitHub，导致只覆盖仓库 content.json 时
+      // 引导页的 apkUrl / 引导文案永远停在部署快照。旧版更早曾无超时硬拉 1.28MB 空等，
+      // 现在两条链路都带超时且内容有变化才重绘，兼顾实时性与速度。
       var SC = (function () {
         try { return new URLSearchParams(location.search).get('sharecode') || 'AK6QIELR67'; }
         catch (e) { return 'AK6QIELR67'; }
@@ -172,19 +175,45 @@
                       { cache: 'no-store' }, ms)
           .then(function (r) { return r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)); });
       }
+      // 【v85】固定 URL + cache:'no-cache' 触发条件请求（内容未变时 304，几乎无流量）；
+      // 超时覆盖到 body 读完，全程 fire-and-forget，绝不拖住首屏。
+      function fetchGithub(ms) {
+        return new Promise(function (resolve, reject) {
+          var ctl = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+          var timer = setTimeout(function () { if (ctl) ctl.abort(); reject(new Error('timeout')); }, ms);
+          var o = { cache: 'no-cache' };
+          if (ctl) o.signal = ctl.signal;
+          fetch(RAW, o).then(function (r) {
+            if (!r.ok) throw new Error('HTTP ' + r.status);
+            return r.json();
+          }).then(function (d) {
+            clearTimeout(timer);
+            if (!d || !d.config) throw new Error('bad payload');
+            resolve(d);
+          }).catch(function (e) { clearTimeout(timer); reject(e); });
+        });
+      }
       function init() {
         var hadCache = renderCached();
+        var ghApplied = false;
+        // 后台校验 GitHub 全量：只覆盖仓库 content.json 也能同步 apkUrl / 引导文案，
+        // 不需要改 meta.json 指纹、也不需要重新部署。内容有变化才重绘。
+        fetchGithub(20000).then(function (data) {
+          ghApplied = true;
+          var raw = JSON.stringify(data);
+          try { if (raw === localStorage.getItem(CACHE_KEY)) return; } catch (e) {}
+          cacheIt(data);
+          render(data);
+        }).catch(function () {});
+        // 同域快渲染；GitHub 新版若已先落地，忽略随后到达的托管旧快照，避免内容被冲回旧版。
         loadJson(LOCAL, 6000)
           .then(function (data) {
             if (!data || !data.config) return Promise.reject(new Error('bad payload'));
+            if (ghApplied) return;
             cacheIt(data);
             render(data);
           })
-          .catch(function () {
-            loadJson(RAW, 2500)
-              .then(function (data) { cacheIt(data); render(data); })
-              .catch(function () { if (!hadCache) showEmpty(); });
-          });
+          .catch(function () { if (!hadCache) showEmpty(); });
       }
       init();
     })();

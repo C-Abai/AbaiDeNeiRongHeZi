@@ -113,9 +113,10 @@ applications:
      哪个会话根放哪个 appId 的 genie，就覆盖哪个链接。
    - 一个工作区/会话只能有一个 app 链接。要同时维护新旧两个链接，需开**两个 WorkBuddy 任务窗口**，
      分别放旧 appId 与新 appId 的 genie。
-   - 旧链接不下线时仍可改内容：内容层改 GitHub content.json + 同步改 meta.json 的 contentHash
-     （两端指纹不同才触发公开端拉取）；更稳是重新部署一次旧 appId。
+   - 旧链接不下线时仍可改内容：内容层**只需把 content.json 覆盖到 GitHub**（v85 起已取消
+     meta.json 指纹门槛，公开端每次启动后台校验 GitHub 全量内容）；更稳是再重新部署一次旧 appId。
      界面 / 代码层只能重新部署旧 appId；旧 APK 内硬编码的 host 无法远程改，只能重新打包。
+     注意新旧链接共用同一份 GitHub content.json，覆盖一次两边访客都会变。
 5. 切新链接的代码改动清单、APK 重打包签名前提、GitHub 内容共享坑，
    详见仓库 HANDOVER.md §5d，**执行迁移前务必先读**。
 
