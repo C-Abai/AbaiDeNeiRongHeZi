@@ -172,8 +172,11 @@
 
   // 后台门禁：仅在 URL 带正确 key 时加载，否则显示 404 并中止（公开端无入口）
   const ADMIN_KEY = 'nebadmin2026';
-  // 已部署的 APK 直装链接（兜底默认值，仅当用户未自行填写时填入后台输入框；可随时在后台修改）
-  const DEFAULT_INSTALL_URL = 'https://content-box-24323.app.workbuddy.host/guide.html?sharecode=AK6QIELR67';
+  // 正式站点根地址：后台可能在本地 / 预览容器（127.0.0.1:端口）里打开，
+  // 对外链接一律用这个固定域名，绝不能用 location.origin 拼，否则显示/复制出去的是无效本地地址。
+  const PUBLIC_ORIGIN = 'https://content-box-24323.app.workbuddy.host';
+  // 已部署的引导页（兜底默认值，仅当用户未自行填写时填入后台输入框；可随时在后台修改）
+  const DEFAULT_INSTALL_URL = PUBLIC_ORIGIN + '/guide.html?sharecode=AK6QIELR67';
   if (new URLSearchParams(location.search).get('key') !== ADMIN_KEY) {
     app.innerHTML = '<div style="padding:80px 20px;text-align:center;color:#bbb;font-size:14px">404 · 页面不存在</div>';
     return;
@@ -552,7 +555,7 @@
       + '<option value="fullscreen"' + (n.mode !== 'bubble' ? ' selected' : '') + '>强制全屏（遮罩盖满整个屏幕，内容居中）</option>'
       + '<option value="bubble"' + (n.mode === 'bubble' ? ' selected' : '') + '>气泡卡片（屏幕中上位置弹下来）</option>'
       + '</select></div>'
-      + '<div class="field"><label>关闭按钮显示度：<span id="n_close_v">' + nCloseVal + '</span> %（100 = 清晰可见，0 = 完全不显示；无论数值多少，屏幕右上角那块 40×40 区域始终可点击关闭）</label><input type="range" id="n_close" min="0" max="100" value="' + nCloseVal + '"/></div>'
+      + '<div class="field"><label>关闭按钮显示度：<span id="n_close_v">' + nCloseVal + '</span> %（100 = 清晰可见，0 = 完全不显示；无论数值多少，卡片右上角那块 40×40 区域始终可点击关闭）</label><input type="range" id="n_close" min="0" max="100" value="' + nCloseVal + '"/></div>'
       + '<div class="field"><label>弹窗主题</label><select id="n_theme">'
       + '<option value="auto"' + (n.theme !== 'light' && n.theme !== 'dark' ? ' selected' : '') + '>跟随站点（浅色 / 暗调自动适配）</option>'
       + '<option value="light"' + (n.theme === 'light' ? ' selected' : '') + '>强制浅色</option>'
@@ -566,7 +569,7 @@
       + '<div class="field"><label>引导按钮文案</label><input type="text" id="n_btn_text" value="' + esc(n.buttonText || '') + '" placeholder="如：前往更新"/></div>'
       + '<div class="field"><label>引导按钮链接（更新网页 / 下载页，需以 http(s):// 开头）</label><input type="text" id="n_btn_url" value="' + esc(n.buttonUrl || '') + '" placeholder="https://..."/></div>'
       + '<div class="checkbox-row"><input type="checkbox" id="n_every" ' + (n.everyTime !== false ? 'checked' : '') + '/><label for="n_every">每次进入都弹出（关闭则同一内容只弹一次）</label></div>'
-      + '<div class="n-warn">ℹ️ 两种展示方式都在<strong>屏幕右上角</strong>带关闭按钮。显示度调到 0 只会让按钮隐形，不会移除点击区域，点右上角仍然可以关闭，不会把访客锁住。</div>'
+      + '<div class="n-warn">ℹ️ 两种展示方式都在<strong>卡片自身的右上角</strong>带关闭按钮。显示度调到 0 只会让按钮隐形，不会移除点击区域，点卡片右上角仍然可以关闭，不会把访客锁住。</div>'
       + '<div class="n-mini-box"><div class="n-mini-lbl">实时效果预览（与公开端「👁 预览」同步渲染；位置与弹出动画请在右侧预览 / 后台全屏预览里看）</div><div id="n_mini"></div></div>'
       + '<p class="help">改完点下方「保存设置」写入本机草稿，再到顶部「发布」推上线后所有设备可见。编辑时右上角「👁 预览」也会实时显示弹窗效果。</p>';
 
@@ -843,7 +846,8 @@
 
   function renderGuide(panel) {
     const g = (content.config && content.config.guide) || {};
-    const guideUrl = location.origin + '/guide.html?sharecode=AK6QIELR67';
+    // 固定正式地址：不依赖当前页面 origin（本地/预览容器会拿到 127.0.0.1）
+    const guideUrl = DEFAULT_INSTALL_URL;
     panel.innerHTML = '<div class="admin-list">'
       + '<div class="sub">📥 引导下载页（独立网页 <code>guide.html</code>，用于引导用户下载安装 APK）</div>'
       + '<div class="guide-preview-box"><div class="gpb-lbl">📱 实时预览（根据下方设置即时更新，预览内按钮不会真正跳转 / 下载）</div>'
@@ -861,10 +865,11 @@
       + (g.icon ? '<button type="button" class="btn ghost" id="g_icon_del">移除</button>' : '') + '</div></div>'
       + '<p class="help">支持横屏 / 竖屏 / 长图，上传后自动缩放并居中裁剪为 256×256 方形图标，无需手动处理尺寸。</p></div>'
       + '<div class="row" style="margin-top:14px"><button class="btn" id="g_save">保存引导页设置</button>'
-      + '<a class="btn ghost" id="g_open" href="guide.html?sharecode=AK6QIELR67" target="_blank" rel="noopener">👁 打开引导页</a></div>'
+      + '<a class="btn ghost" id="g_open" href="' + esc(DEFAULT_INSTALL_URL) + '" target="_blank" rel="noopener">👁 打开引导页</a></div>'
       + '<div class="guide-url-box"><div class="gub-lbl">引导页独立地址（可直接发送给用户）</div>'
       + '<div class="gub-row"><input class="gub-input" id="g_url" type="text" readonly value="' + esc(guideUrl) + '">'
       + '<button type="button" class="btn ghost" id="g_url_cp">复制</button></div>'
+      + '<div class="gub-full">' + esc(guideUrl) + '</div>'
       + '<p class="help">该地址即引导页独立链接，可在「站点设置 → APK 直装链接」里指向它作为统一下载入口。</p></div>';
 
     var currentIcon = g.icon || '';

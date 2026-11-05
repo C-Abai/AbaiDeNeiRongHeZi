@@ -1,8 +1,8 @@
 /* 强制提示更新弹窗 —— 公开端 / 预览 iframe / 后台设置共用同一套渲染
  * 由 CBNotice.html() 产出 HTML、CBNotice.mount() 挂到 body。
  * 主题：auto 跟随 body.dim（公开端浅色/暗调），light / dark 为强制覆盖。
- * 关闭按钮：全屏 / 气泡两种模式都固定在视口右上角；closeOpacity 只控制视觉可见度
- * （0 = 完全隐形），按钮节点与点击热区始终保留，点右上角仍可关闭。
+ * 关闭按钮：全屏 / 气泡两种模式都放在**卡片自身的右上角**（作为 .upd-card 的首个子元素）；
+ * closeOpacity 只控制视觉可见度（0 = 完全隐形），按钮节点与点击热区始终保留。
  */
 (function (global) {
   function esc(s) {
@@ -33,7 +33,8 @@
   }
 
   function cardHtml(c, opts) {
-    let h = '<div class="upd-card" style="--upd-accent:' + c.accent + '">';
+    // 关闭按钮是卡片的首个子元素：CSS 用 absolute 定位到卡片自身右上角
+    let h = '<div class="upd-card" style="--upd-accent:' + c.accent + '">' + closeHtml(c);
     if (c.icon) h += '<img class="upd-icon" src="' + esc(c.icon) + '" alt=""/>';
     h += '<div class="upd-title">' + esc(c.title || '提示') + '</div>';
     if (c.text) h += '<div class="upd-text">' + esc(c.text).replace(/\n/g, '<br>') + '</div>';
@@ -46,7 +47,7 @@
     return h;
   }
 
-  // 两种模式共用：始终渲染右上角关闭按钮。
+  // 两种模式共用：始终渲染卡片右上角的关闭按钮。
   // 显示度用 inline opacity 实现——即便为 0，按钮仍占位、可点击，
   // 绝不能用 display:none / visibility:hidden / pointer-events:none，否则访客会被锁在弹窗里。
   function closeHtml(c) {
@@ -61,7 +62,7 @@
     opts = opts || {};
     const c = norm(cfg);
     if (!c.enabled && !opts.force) return '';
-    const inner = cardHtml(c, opts) + closeHtml(c);
+    const inner = cardHtml(c, opts);
     if (opts.inline) return '<div class="upd-inline-preview upd-' + c.theme + '">' + inner + '</div>';
     return '<div class="upd-mask ' + (c.mode === 'bubble' ? 'upd-bubble' : 'upd-full')
       + ' upd-' + c.theme + '" id="updNotice">' + inner + '</div>';

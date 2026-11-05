@@ -355,4 +355,13 @@ git diff --stat HEAD origin/main                   # 其他文件差异摘要
 - **版本**：SW `contentbox-v81`，`js/app.js` 注册 `&v=81`，`meta.json` = `{"contentHash":"v81-notice-close-20261105","sw":"contentbox-v81"}`（content.json 本身未改）。
 - **验证**：5 个 JS 文件 `node --check` 全过、CSS 括号平衡、`n_*` 表单 id 与引用一致；vm 模拟 DOM 跑 32 项测试全过（两种模式均有 ×、未填链接也有 ×、显示度 0 仍保留节点与热区、负数/超界/非法值钳制、老配置缺省 100、点右上角可卸载、XSS 转义、CSS 定位与动画存在）。
 
+## 2026-11-05 补充：× 移回卡片右上角 + 全屏放大 + 引导页网址修复（v82）
+
+- **用户截图纠正两处**：① 关闭 × 要放在**卡片自身的右上角**（v81 做成「屏幕右上角 fixed」是理解错了），全屏模式的卡片可以**大一些**；② 后台「引导页」设置底部显示的独立网址是错的，显示成 `http://127.0.0.1:63250/guide.html?...` 这种无效本地地址，正确应为 `https://content-box-24323.app.workbuddy.host/guide.html?sharecode=AK6QIELR67`。
+- **① 关闭按钮 / 卡片尺寸**：`js/notice.js` 把 `closeHtml(c)` 从 `html()` 挪进 `cardHtml()`，作为 `.upd-card` 的**首个子元素**；CSS `.upd-close` 由 `position:fixed` 改回 `position:absolute; top:10px; right:12px`（相对卡片），配色改为按**卡片主题**（浅色卡片灰字半透明灰底；`body.dim` / `upd-dark` 浅字半透明白底），不再按遮罩配色。`.upd-full .upd-card` 放大到 `max-width:440px; padding:40px 32px 30px; border-radius:24px`，图标 88px、标题 23px、正文 15px；气泡保持 340px。后台滑块说明与警告文案同步改为「卡片右上角」。显示度 0% 隐形但热区常驻的逻辑不变。
+- **② 网址根因**：`renderGuide()` 用 `location.origin + '/guide.html?...'` 拼对外链接，而后台在本地 / 预览容器里打开时 `location.origin` 是 `http://127.0.0.1:63250`，于是显示和「复制」按钮都给出无效地址。修复：`js/admin.js` 顶部定义 `PUBLIC_ORIGIN = 'https://content-box-24323.app.workbuddy.host'`，`DEFAULT_INSTALL_URL = PUBLIC_ORIGIN + '/guide.html?sharecode=AK6QIELR67'`；`guideUrl = DEFAULT_INSTALL_URL`，`#g_open` 的 href 也改用它；网址框新增 `.gub-full` 完整可换行文本（输入框太窄会截断长域名）。同类隐患一并修掉：`js/app.js` 关于页二维码 `aboutQrUrl` 也改为固定正式地址，避免扫出 127.0.0.1。
+- **⚠️ 长期规则**：凡是「要发给别人 / 要生成二维码」的对外链接，**不得再用 `location.origin` 拼接**，统一走固定正式域名（appId 不变则链接不变）。
+- **版本**：SW `contentbox-v82`，`js/app.js` 注册 `&v=82`，`meta.json` = `{"contentHash":"v82-card-close-guideurl-20261105","sw":"contentbox-v82"}`；`content.json` 未改。
+- **验证**：5 个 JS `node --check` 全过、CSS 括号平衡、`n_*` 表单 id 与引用一致；vm 模拟 DOM 跑 **41 项测试全过**（关闭按钮在卡片内而非卡片外、两种模式都有 ×、显示度 0 仍可点与卸载、全屏 440px、气泡动画仍在、引导页常量拼出用户给的正确网址、无残留 `location.origin` 拼接、二维码固定地址）。
+
 *本手册由助手在 v69 发布后整理并更新，作为跨设备恢复上下文使用。*

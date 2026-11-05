@@ -1045,6 +1045,9 @@ body.admin-dark .chat-seg-ta { background: #20242b; color: #e6e8eb; border-color
 .guide-url-box .gub-row { display: flex; gap: 8px; align-items: stretch; }
 .guide-url-box .gub-input { flex: 1; min-width: 0; font-size: 12px; color: #3a3f47; background: #fff; border: 1px solid #d7dde3; border-radius: 8px; padding: 8px 10px; }
 .guide-url-box .gub-input:focus { outline: none; border-color: var(--green); }
+/* 输入框宽度有限，下面再完整展示一遍网址，避免长域名被截断看不到 */
+.guide-url-box .gub-full { margin-top: 8px; font-size: 12px; line-height: 1.6; color: #3a3f47; word-break: break-all; user-select: all; }
+body.admin-dark .guide-url-box .gub-full { color: #c7cdd6; }
 
 /* 引导页实时预览 */
 .guide-preview-box { margin: 4px 0 18px; background: #f6f8fa; border: 1px solid #e3e8ee; border-radius: 14px; padding: 14px; }
@@ -1101,27 +1104,27 @@ body.admin-dark .chat-seg-ta { background: #20242b; color: #e6e8eb; border-color
 }
 .upd-btn:active { transform: scale(.98); }
 .upd-btn:disabled { cursor: default; opacity: .95; }
-/* 关闭按钮：全屏 / 气泡统一固定在视口右上角，40×40 点击热区恒定。
+/* 关闭按钮：固定在「卡片自身」右上角（两种模式都随卡片走），40×40 点击热区恒定。
    显示度由 inline opacity 控制（0 = 隐形但仍可点），绝不能用 display/visibility/pointer-events 隐藏。 */
 .upd-close {
-  position: fixed; z-index: 10001;
-  top: max(12px, env(safe-area-inset-top)); right: 12px;
+  position: absolute; z-index: 2;
+  top: 10px; right: 12px;
   width: 40px; height: 40px; padding: 0;
   display: flex; align-items: center; justify-content: center;
   border: none; border-radius: 50%; cursor: pointer;
   font-size: 26px; line-height: 1;
-  background: rgba(0,0,0,.30); color: #fff;
-  -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
+  background: rgba(127,127,127,.10); color: var(--muted, #8a8f99);
   pointer-events: auto;
 }
-.upd-close:hover { filter: brightness(1.18); }
+.upd-close:hover { background: rgba(127,127,127,.20); }
 .upd-close:active { transform: scale(.94); }
-/* 全屏：深色遮罩上用白字 + 半透明黑圆底 */
-.upd-full .upd-close { background: rgba(0,0,0,.30); color: #fff; box-shadow: 0 2px 12px rgba(0,0,0,.18); }
-/* 气泡：无遮罩，浅色圆底深字，任意壁纸上都看得清 */
-.upd-bubble .upd-close { background: rgba(255,255,255,.88); color: #4a525d; box-shadow: 0 3px 14px rgba(0,0,0,.16); }
-.upd-mask.upd-bubble.upd-dark .upd-close,
-body.dim .upd-mask.upd-bubble.upd-auto .upd-close { background: rgba(38,42,52,.92); color: #eaedf1; }
+
+/* 全屏卡片放大一档（气泡仍是 340px 小卡片） */
+.upd-full .upd-card { max-width: 440px; padding: 40px 32px 30px; border-radius: 24px; }
+.upd-full .upd-icon { width: 88px; height: 88px; border-radius: 22px; }
+.upd-full .upd-title { font-size: 23px; }
+.upd-full .upd-text { font-size: 15px; }
+.upd-full .upd-close { top: 14px; right: 16px; }
 
 /* 明暗：auto 跟随 body.dim；light / dark 强制覆盖 */
 body.dim .upd-mask.upd-auto .upd-card { background: rgba(24,27,36,.94); color: #eaedf1; border-color: rgba(255,255,255,.14); }
@@ -1130,17 +1133,17 @@ body.dim .upd-mask.upd-auto .upd-text { color: #a9b0bb; }
 .upd-mask.upd-light .upd-text, .upd-inline-preview.upd-light .upd-text { color: #8a8f99; }
 .upd-mask.upd-dark .upd-card, .upd-inline-preview.upd-dark .upd-card { background: #1e222a; color: #eaedf1; border-color: rgba(255,255,255,.14); }
 .upd-mask.upd-dark .upd-text, .upd-inline-preview.upd-dark .upd-text { color: #a9b0bb; }
+/* 深色卡片上的关闭按钮：浅字 + 半透明白底 */
+body.dim .upd-mask.upd-auto .upd-close,
+.upd-mask.upd-dark .upd-close,
+.upd-inline-preview.upd-dark .upd-close,
+body.admin-dark .upd-inline-preview.upd-auto .upd-close { background: rgba(255,255,255,.10); color: #a9b0bb; }
 
 /* 后台「站点设置」里的缩小预览（不产生 fixed 浮层） */
 .upd-inline-preview { position: relative; display: flex; justify-content: center; padding: 8px; }
 .upd-inline-preview .upd-card { position: relative; max-width: 300px; box-shadow: 0 6px 20px rgba(0,0,0,.12); }
-/* 后台缩小预览里不能让右上角按钮 fixed 飘到整个页面，改为相对预览框定位 */
-.upd-inline-preview .upd-close {
-  position: absolute; top: 10px; right: 10px; width: 28px; height: 28px;
-  font-size: 20px; background: rgba(127,127,127,.14); color: var(--muted, #8a8f99);
-  box-shadow: none; -webkit-backdrop-filter: none; backdrop-filter: none;
-}
-body.admin-dark .upd-inline-preview .upd-close { background: rgba(255,255,255,.12); color: #aeb6c2; }
+/* 缩小预览里关闭按钮也缩小一档，仍贴在卡片自身右上角 */
+.upd-inline-preview .upd-close { top: 6px; right: 6px; width: 28px; height: 28px; font-size: 20px; }
 .n-mini-box { background: #f6f8fa; border: 1px solid #e3e8ee; border-radius: 12px; padding: 10px; margin: 10px 0; min-height: 90px; }
 .n-mini-box .n-mini-lbl { font-size: 12px; color: #8a9099; margin-bottom: 6px; }
 .n-warn { font-size: 12px; color: #a86a00; line-height: 1.7; background: #fff8e8; border-radius: 8px; padding: 8px 10px; margin: 8px 0; }
