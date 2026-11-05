@@ -160,18 +160,18 @@ def rebind_github():
     return changed
 
 
-def validate(new_host, new_sc):
+def validate(new_host, new_sc, old_host=OLD_HOST, old_sc=OLD_SC):
     """自检：残留旧标识、content.json 合法、图片齐全、SW 一致。返回 (ok, lines)。"""
     lines = []
     ok = True
 
-    # 1) 旧标识残留
+    # 1) 旧标识残留（按传入的旧标识查，支持任意来源链接迁移）
     for rel in SC_FILES + HOST_FILES:
         p = ROOT / rel
         if not p.is_file():
             continue
         t = read_text(p)
-        h = t.count(OLD_HOST); s = t.count(OLD_SC)
+        h = t.count(old_host); s = t.count(old_sc)
         if h or s:
             ok = False
             lines.append('  ✗ %s 仍含旧 host×%d / 旧 sharecode×%d' % (rel, h, s))
@@ -269,7 +269,7 @@ def main():
     print('=' * 64)
 
     if mode == 'check':
-        ok, lines = validate(args.new_host, args.new_sharecode)
+        ok, lines = validate(args.new_host, args.new_sharecode, args.old_host, args.old_sharecode)
         print('自检结果:')
         for l in lines:
             print(l)
@@ -324,7 +324,7 @@ def main():
     if rb:
         print('  ✓ 重新绑定 GitHub 同步: ' + ', '.join(rb) + ' (USE_GITHUB_SYNC=true)')
 
-    ok, lines = validate(args.new_host, args.new_sharecode)
+    ok, lines = validate(args.new_host, args.new_sharecode, args.old_host, args.old_sharecode)
     for l in lines:
         print(l)
 
