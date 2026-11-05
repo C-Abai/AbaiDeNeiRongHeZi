@@ -53,11 +53,13 @@ ROOT = HERE.parent                               # <root>
 OLD_HOST = 'content-box-24323.app.workbuddy.host'
 OLD_SC = 'AK6QIELR67'
 
-# 含 sharecode 字面量的代码文件（不含 .md / .txt 文档、不含 assets 二进制）
+# 含 sharecode 字面量的【项目】文件（不含 .md / .txt 文档、不含 assets 二进制、
+# 不含 tools/ —— externalize_images.py 的 DEFAULT_SHARECODE 与本工具 OLD_SC 都合法
+# 持有旧值，绝不能被文本替换污染）。图片路径重签由 run_externalize() 子进程完成。
 SC_FILES = [
     'guide.html', 'content.json', 'index.html', 'admin.html', 'preview.html',
     'download.html', 'manifest.webmanifest', 'sw.js',
-    'js/store.js', 'js/app.js', 'js/admin.js', 'tools/externalize_images.py',
+    'js/store.js', 'js/app.js', 'js/admin.js',
 ]
 # 含原 host 字面量的代码文件
 HOST_FILES = ['content.json', 'js/app.js', 'js/admin.js']
