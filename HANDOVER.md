@@ -14,7 +14,7 @@
 | 项目 | 值 |
 |---|---|
 | 线上地址（分享 / 前台） | `https://content-box-24323.app.workbuddy.host/?sharecode=AK6QIELR67` |
-| 后台（管理 / 编辑） | `https://content-box-24323.app.workbuddy.host/admin.html?key=nebadmin2026` |
+| 后台（管理 / 编辑，必须双参数） | `https://content-box-24323.app.workbuddy.host/admin.html?sharecode=AK6QIELR67&key=nebadmin2026` |
 | 部署 appId（同链接重部署用） | `wbapp_jFiM5Y7b9RmUulYAimy36N` |
 | GitHub 仓库 | `https://github.com/C-Abai/AbaiDeNeiRongHeZi`（Public，main 分支） |
 | APK 直链（下载安装包，必带 sharecode） | `https://content-box-24323.app.workbuddy.host/app.apk?sharecode=AK6QIELR67` |
@@ -24,15 +24,23 @@
 
 ## 1. 数据到底从哪来？（核心架构，务必先读）
 
-**关键结论：线上显示的内容不是从这个聊天平台「存」出来的，而是从 GitHub 仓库实时拉取的。**
+**关键结论（v79 重构后）：线上内容以「当前链接托管的 `./content.json`」为权威，GitHub raw 只作异步补充校验。**
 
-- 内容源（方案 A）：
-  `https://raw.githubusercontent.com/C-Abai/AbaiDeNeiRongHeZi/refs/heads/main/content.json`
-- 站点 `js/store.js` 里的 `GITHUB_CONTENT_URL` 指向上面这个地址；**每次打开 App 都会去 GitHub 拉最新的 `content.json`**。
-- 兜底机制：如果 GitHub 拉不到（仓库被删 / 搞乱），App 自动回退到内置的 `content.json`，照常运行，不会挂。
-- `meta.json` 也在仓库里，用于内容指纹比对；但 v61 之后已做「免维护」——靠 `content.json` 的 `Content-Length` 自动探测变化，**改内容无需手动改 meta.json**。
+- 站点 `js/store.js`：`CONTENT_URL = './content.json?sharecode=...'`（同域），每次启动必拉一次，
+  带 6s 超时；拿到即写缓存并 `onUpdate` 重绘，**不参与指纹判定**。
+- `crossCheckGithub()` 异步比对 GitHub raw 与同域 `meta.json` 的 `contentHash`：
+  **两端不同**才拉 GitHub 全量 `content.json` 覆盖；两端相同 / GitHub 读不到（2.5–3s 超时）就跳过。
+- 首次访问无缓存：同域（8s）→ GitHub raw（2.5s）→ 内置种子内容，故断网也能开。
+- ⚠️ 托管平台**所有静态资源必须带 `sharecode` 门禁参数**，否则返回「链接不完整」HTML/403；
+  `store.js` 的 `gate()` 会自动补。`content.json` / `meta.json` / `guide.html` 由 SW 完全放行、不缓存。
+- ⚠️ **改 GitHub 内容必须同时改 `meta.json` 的 `contentHash`**，否则两端指纹相同，公开端不会拉取。
+  后台「保存即发布」（配 PAT 后）会自动同步改指纹；手动在 GitHub 覆盖 content.json 时别漏。
+- 托管平台的 `./content.json` **不会**随浏览器/GitHub 发布而变，只有助手重新部署才更新。
+  两者长期不一致时以同域为准，GitHub 仅纠正差异；跨境超时则访客仍看到托管旧内容。
 
-> 一句话记住：**改内容 = 改 GitHub 仓库里的 `content.json`；改代码 = 改项目文件再部署。**
+> 一句话记住：**改内容 = 改 GitHub 的 `content.json` + 改 `meta.json` 指纹（或让助手重新部署）；
+> 改代码 / 界面 = 改项目文件再部署。**
+> （本节为 v79 后架构；早期 v61 版「GitHub raw 为权威、无需改 meta.json」的说法已作废。）
 
 ---
 
@@ -82,10 +90,17 @@ git diff --stat HEAD origin/main                   # 其他文件差异摘要
 - 改内容 → 你提需求，或直接去 GitHub 改 `content.json`（无需重部署）。
 - 改代码 / 界面 → 助手 `clone` 仓库到当前环境修改，再用同一个 `appId` 部署，**链接不变**。
 
-**从新设备部署的标准口令（直接复制给助手即可）**：
-> 「更新部署内容盒子，目录是我刚 `clone` 的仓库，appId 用 `wbapp_jFiM5Y7b9RmUulYAimy36N`，
+**从新设备部署的标准口令（2026-11-05 最终定稿，直接复制给助手即可）**：
+> 「更新部署内容盒子，目录是我刚 `clone` 的仓库。先确认登录的是**同一个 WorkBuddy 平台账号**；
+> 把 `.wbapp_jFiM5Y7b9RmUulYAimy36N.genie` 和 `.workbuddy/applications.yaml`
+> 放到**本次任务的会话根目录**（`C:\Users\<用户>\WorkBuddy\<日期时间>\`，与项目文件夹同级，**不是项目里面**），
+> `localDir` 改成新设备项目的实际绝对路径；部署时**不要传 appId**，
+> `language=static`、`entryHtml=index.html`、`userAskedToPublish=true`；
 > 保持原链接 `…24323` 不变，不要生成新链接。后台密钥 `nebadmin2026`。」
-只要带上这个 appId，无论在哪台设备、哪个目录部署，都只会覆盖原链接（本助手已实测验证）。
+
+⚠️ **不要再用早期版本「显式传 appId 就行」的说法**（11-03 的结论已被 11-04 真实新设备测试推翻）。
+发布系统按「部署目录 → 应用」的映射定位目标，映射只认**会话根目录**下的 genie 文件；
+扫到同 appId 就覆盖原链接，扫不到就静默新建。详见 §5、§5c。
 
 > 助手不需要你提供任何本地文件——仓库里已有完整工程 + 本文档，足够恢复。
 
@@ -93,11 +108,18 @@ git diff --stat HEAD origin/main                   # 其他文件差异摘要
 
 ## 4. 日常改内容（最常用，换不换电脑都行）
 
-**只需在 GitHub 仓库覆盖 `content.json`，线上自动同步，无需重部署。**
+**改 `content.json` 推到 GitHub 即可，无需重部署 —— 但必须同时改 `meta.json` 的 `contentHash`。**
 
-- 方法①：GitHub 网页打开 `content.json` → 编辑或上传新文件覆盖 → 提交。
-- 方法②：开后台 `admin.html?key=nebadmin2026` 编辑 → 导出 `content.json` → 回 GitHub 覆盖上传。
+- 方法①：GitHub 网页覆盖 `content.json` → **再把 `meta.json` 的 `contentHash` 改成任意新值** → 提交。
+- 方法②：开后台（双参数地址见 §0）编辑 → 「发布」tab 配置 PAT 后自动发布（后台会自动同步改指纹）；
+  未配 PAT 则导出 `content.json` 让助手推上线（助手会同时改指纹）。
+- 原理（v79 重构后，以 `js/store.js` 为准）：公开端以**同域 `./content.json` 为权威**，每次启动必拉；
+  GitHub raw 只在「GitHub 的 `meta.json.contentHash` ≠ 同域 `meta.json.contentHash`」时才异步拉全量覆盖。
+  **两端指纹相同 → 直接跳过，只改 GitHub 内容不会生效**（早期文档这里写漏了）。
 - 改完在手机上**杀掉 PWA 后台进程重进**（或强刷），新内容即生效。
+- ⚠️ 只推 GitHub、不重部署时，托管平台的 `./content.json` 仍是旧版。GitHub raw 跨境有 2.5s 超时，
+  且「同域权威刷新」与「GitHub 补充」可能互相覆盖。要给**所有**访客强推公告（如迁移通知），
+  最稳是重新部署一次对应 appId（见 §5d）。
 
 ⚠️ **致命坑（务必记住）**：GitHub 网页「覆盖上传」时，**只选 `content.json` 一个文件**。
 千万别把 `css/style.css`、`js/app.js`、`sw.js`、`meta.json` 也一起传上去——
@@ -112,14 +134,21 @@ git diff --stat HEAD origin/main                   # 其他文件差异摘要
   - `directory` = 项目根目录（含 `index.html` 的那一层，即从仓库 `clone` 出来的目录）
   - `language` = `static`
   - `entryHtml` = `index.html`
-  - `appId` = `wbapp_jFiM5Y7b9RmUulYAimy36N`（复用则链接不变）
+  - `domainPrefix` = `content-box-24323`（新建应用时请求该子域；命中已有应用时被忽略）
+  - `appId` = **不要传**（工具靠会话根 genie 自动命中；仅 `unpublish` 多应用时才需要）
   - `userAskedToPublish` = `true`（用户说「发布 / 上线」时才置真）
 - 流程：改完项目文件 → 告诉助手「发布」→ 助手部署 → 链接不变。
-- ⚠️ **跨设备部署铁律（已实测验证，2026-11-04 修正）**：发布系统按「**部署目录 → 应用的映射**」定位目标，映射记录在**工作区根目录**（即项目文件夹的父目录）的 `.wbapp_<appId>.genie` 与 `.workbuddy/applications.yaml` 两个文件里。工具扫工作区根找 genie → 命中 appId 就覆盖原链接，找不到就静默新建。
-  - **换设备不换链接（已实测可行）**：满足 ① 登录**同一个 WorkBuddy 平台账号**；② 把这两个映射文件放到新设备的**工作区根目录**（不是项目里面）；③ `localDir` 改成新设备实际路径 —— 即可从任意新路径部署并覆盖 `…24323`。2026-11-04 已在本机用**全新路径 + 同账号**实测：部署时工具解析到 `wbapp_jFiM5Y7b9RmUulYAimy36N`（**未新建链接**），铁证成立。
-  - **2026-11-03 失败的真实原因**：当时把 genie/yaml 放进了**项目子目录里**（被文档 "inside the directory" 字面误导），工具在工作区根扫不到 → 当新应用，误生 `…87884`（已下架）。**关键：genie 必须在「工作区根目录」，不是项目内。**
-  - 部署时不要传 `appId`（工具靠目录 + genie 自动命中）；只有 `unpublish` 多应用时才需要 `appId`。
-  - 详见下方「§5c 换设备不换链接 · 实测步骤」。
+- ⚠️ **跨设备部署铁律（2026-11-05 定稿）**：发布系统按「**部署目录 → 应用的映射**」定位目标，
+  映射记录在 **WorkBuddy 会话根目录**（`C:\Users\<用户>\WorkBuddy\<日期时间>\`，即本次任务的文件夹）
+  的 `.wbapp_<appId>.genie` 与 `.workbuddy/applications.yaml` 里。工具扫会话根找 genie →
+  命中 appId 就覆盖原链接，找不到就静默新建。**会话根 ≠ 项目文件夹的父目录**（除非两者恰好重合）。
+  - **换设备不换链接的三个条件**：① 登录**同一个 WorkBuddy 平台账号**；② 两个映射文件放在新设备的
+    **会话根目录**（与项目文件夹同级，不是项目里面）；③ `localDir` 改成新设备项目的实际绝对路径。
+  - 2026-11-04 真实新设备测试**失败**：genie 放进了项目子目录 → 会话根扫不到 → 静默新建 `…71596`
+    （已下线）；工具把误建应用的 genie 写到了会话根，反证会话根才是扫描/写入基准。
+  - 2026-11-05 在原机器部署 v84 时**未传 appId**，仍返回 `…24323`、`verified:true`，
+    `genieFilePath` 指向会话根那个 genie —— 本机再次印证机制成立；**真实新设备 + 正确位置尚未复测成功**。
+  - 详见下方「§5c 换设备不换链接 · 实测步骤」与「§5d 验证失败后的迁移预案」。
 - ⚠️ **改 CSS/JS 后必须升 Service Worker 版本号**：改 `sw.js` 里的 `CACHE = 'contentbox-vXX'` 与 `meta.json` 的 `sw` 字段到新版本，
   否则老用户浏览器缓存名不变，会继续加载旧界面、看不到新优化。
 - ⚠️ **SW 注册地址版本号必须同步自增**：`js/app.js` 里 `navigator.serviceWorker.register('sw.js?sharecode=AK6QIELR67&v=XX')` 的 `&v=` 与 `sw.js` 的 `CACHE` 版本号**必须一起 +1**（当前 v76）。
@@ -174,9 +203,71 @@ git diff --stat HEAD origin/main                   # 其他文件差异摘要
 - `SITES_START_FAILED`（沙箱冷启动超时，非代码问题）：重试一次即可。
 - 若失败且指向现有 appId，**原链接可能暂时打不开**——立刻从会话根重部署一次恢复。
 
-**现状与建议**：
-- 本方法（genie 在会话根）**尚待复测确认**（上次测试因位置错误而失败，未验证正确位置）。若要严格验证，需在真实新设备把 genie 放到**会话根**再部署一次——该步骤会**真正触碰生产链接 `…24323`**，需你另行明确授权。
-- 最稳妥仍建议：**始终用原始机器发版**（其会话根 `2026-10-27-16-09-30\` 已含正确 genie，可稳定覆盖）；跨设备仅作原机器不可用时的备选。
+**验证状态（2026-11-05 定稿）**：
+- 方案本身已按根因修正并固化（见 §3 标准口令 / §5 铁律）；**「真实新设备 + 正确位置」的完整验证待用户于 2026-11-05 晚执行**。
+- 该验证会**真正触碰生产链接 `…24323`**，需用户明确授权后进行；判定标准见
+  `新设备跨设备部署验证指令.txt`（已随仓库提供）。
+- 原机器（会话根 `2026-10-27-16-09-30\`，genie 已就位）始终是最稳的发版环境；
+  跨设备是原机器不可用时的备选。
+
+## 5d. 验证失败 → 切换新链接的迁移预案（2026-11-05 定稿）
+
+适用：新设备按 §5c 验证后**仍生成新链接**，决定「以后用新链接部署、旧链接暂时不下线」，
+并在旧链接上发布新链接与新 APK 的迁移公告，让老用户平滑过渡。
+
+### 先纠正一个概念：仓库不绑定链接
+- GitHub 仓库只是代码与内容，**不绑定任何链接**。绑定关系是
+  「**平台账号 + 本地会话根的 `.wbapp_<appId>.genie`**」：工具按 `directory` 去它所在的会话根扫 genie，
+  命中哪个 appId 就覆盖哪个链接。
+- 所以「改用新链接」准确说是：**新设备那个会话/工作区**绑定了新 appId；同一份仓库可以被部署到多个 appId。
+- ⚠️ **一个工作区/会话只能有一个 app 链接**。要同时维护新旧两个链接，必须**开两个 WorkBuddy 任务窗口**
+  （两个不同会话根，各放对应 appId 的 genie）。千万别在同一窗口部署第二个目录，那会覆盖第一个应用。
+- 验证失败后**立刻记录**：新链接完整 URL（含 `sharecode`）、新 appId（在会话根 genie 文件名里），
+  写进本文档并推仓库，否则以后无法稳定覆盖新链接。
+
+### 旧链接不下线时，还能改它的内容吗？——能，但分三层
+| 想改的东西 | 能否改 | 怎么做 |
+|---|---|---|
+| 内容（文章 / 链接 / 公告 / `updateNotice` 弹窗 / `apkUrl`） | ✅ 能，不必下线 | 改 GitHub `content.json` + **同步改 `meta.json` 指纹**（见 §4）；更稳是重新部署一次旧 appId |
+| 界面 / 代码（HTML、CSS、JS、SW、后台页） | ✅ 能，但**只能重新部署** | 在另一个会话根放旧 appId 的 genie，从那里部署；改 GitHub 对代码无效 |
+| 旧 APK 里硬编码的地址 | ❌ 改不了 | APK 是 TWA，`host` 写死在打包配置里，只能重新打包新 APK 让用户手动安装 |
+
+结论：**迁移公告完全发得出去**，因为它属于「内容」层；旧链接不下线不构成障碍。
+
+### 迁移公告怎么落地（推荐顺序）
+1. 在 `content.json` 里：`config.updateNotice.enabled = true`，标题/正文写迁移说明，
+   `buttonText` 改「前往新地址」，`buttonUrl` 指向**新链接的引导页**；
+   `config.apkUrl` 改指**新 APK 直链**（新域名 + `/app.apk?sharecode=<新 sharecode>`）；
+   `config.author.intro` 的「站点官网」、links 里指向旧域名的条目一并改新域名；再发一篇置顶公告。
+2. 旧链接当前 v83 代码**已支持 `updateNotice` 全屏弹窗**，开启即生效，**无需改代码**。
+   老用户点「一键安装」→ 引导页读 `apkUrl` → 下载新 APK，这条链路可远程改，不需要动旧 APK。
+3. 让公告覆盖所有旧访客：最稳是**重新部署一次旧 appId**，把公告版 content.json 写进旧链接托管。
+   只推 GitHub 依赖访客能访问 raw（跨境 2.5s 超时），且「同域权威刷新」与「GitHub 补充」
+   可能互相覆盖造成内容抖动。
+4. 新链接侧同步部署代码，并按下面清单改完再发布。
+
+### 切到新链接的代码改动清单（新链接的 sharecode 很可能不同！）
+- `SC` 在 `store.js` / `admin.js` / `guide.html` 中是「优先读 URL 参数，缺省回落 `AK6QIELR67`」，
+  故数据请求会自动适配；但以下**写死**处必须全局替换成新域名 + 新 sharecode：
+  - `index.html` / `admin.html` / `preview.html` / `download.html` / `manifest.webmanifest` 里所有 `?sharecode=AK6QIELR67`
+  - `js/app.js`：SW 注册 `sw.js?sharecode=...&v=83`、`aboutQrUrl`、`ensureScript` 的 js 路径、
+    关于页后台入口 `admin-mini`（当前仍是单参数 `admin.html?key=...`，应补 sharecode）
+  - `js/admin.js`：`PUBLIC_ORIGIN`、`DEFAULT_INSTALL_URL`、两处预览 iframe URL、`fetch('sw.js?...')`
+  - `content.json`：`apkUrl`、`author.intro` 官网、links 里的旧域名、引导页配置里的地址
+- 改完**升 SW 版本号**：`sw.js` 的 CACHE / `meta.json` 的 sw / `js/app.js` 的 `&v=` 三处同号 +1。
+
+### APK 重新打包的两个硬前提
+- 旧 APK 是 TWA：`host = https://content-box-24323.app.workbuddy.host`（见打包用 `payload.json`），
+  新包要把 `host` / `iconUrl` / `webManifestUrl` / `startUrl` 全改到新链接。
+- ⚠️ **`app.apk`、签名 keystore、`apk-build/` 都不在 GitHub 仓库里**（`.gitignore` 排除 apk，
+  apk-build 在会话根而非项目内），新设备 clone 仓库拿不到。重新打包前务必从旧机器备份**签名文件**，
+  并保持 `packageId = com.contentbox.app`；**签名不一致时用户无法覆盖安装，只能卸载重装**，
+  这会直接破坏「让老用户平滑更新」的目标。
+
+### 何时下线旧链接
+保留到绝大多数老用户已装新 APK / 已访问新链接之后。旧链接不下线不影响新链接，
+但两者**共用同一个 GitHub `content.json` / `meta.json`**：迁移期请让两边显示同一份迁移版内容，
+或让新链接以自身托管的 content.json 为准（令其本地 `contentHash` 与 GitHub 一致），避免内容互相打架。
 
 ---
 
@@ -260,8 +351,9 @@ git diff --stat HEAD origin/main                   # 其他文件差异摘要
 
 - **现象**：用户用 `admin.html?sharecode=AK6QIELR67` 打开后台，页面显示「404 · 页面不存在」（标题仍是"后台管理 - 内容盒子"，说明外壳已加载、被门禁拦下）。
 - **根因**：`js/admin.js` 第 87–92 行有后台门禁：`const ADMIN_KEY='nebadmin2026'`；仅当 URL 带 `?key=nebadmin2026` 时才加载后台，否则渲染「404 · 页面不存在」。`sharecode` 只是内容数据访问钥匙（`content.json` 拉取用），**不是后台门禁钥匙**。助手此前误把后台链接写成 `?sharecode=...` 导致 404。
-- **正确后台地址（唯一）**：`https://content-box-24323.app.workbuddy.host/admin.html?key=nebadmin2026`（sharecode 后台内默认取 AK6QIELR67，无需手加）。
-- **公开端「关于」入口**：`js/app.js` 第 740 行 `<a class="admin-mini" href="admin.html?key=nebadmin2026">` 即正确后台入口；手机 App 内打开后台能进且为新版（v71 含引导页），电脑若显示旧版是 PWA Service Worker 旧缓存所致，强制刷新(Ctrl+Shift+R)或清除站点存储即可。
+- **正确后台地址（唯一，v78 更正）**：`https://content-box-24323.app.workbuddy.host/admin.html?sharecode=AK6QIELR67&key=nebadmin2026`（两个参数缺一不可）。
+- **公开端「关于」入口**：`js/app.js` 的 `<a class="admin-mini" href="admin.html?key=nebadmin2026">Hi</a>` 仍是单参数，靠平台 Cookie 在已登录设备上能进；**无痕窗口 / 新设备会被 403**，此时请手动用上面的双参数地址。
+- ⚠️ 上面两条是 v71 当时的记录，其中「单参数即可」的结论**已被 v78 实测推翻**（详见下方 v79 补充）：单独带 key 会 403「链接不完整」，只带 sharecode 会被 admin.js 挡成 404。
 - **约定**：后台/管理类链接统一用 `?key=nebadmin2026`；APK 直装链接、引导页链接、内容数据仍用 `?sharecode=AK6QIELR67`。两者不可混用。
 
 ## 2026-11-04 补充：引导页图标改上传 + 引导页展示独立网址（v72）
