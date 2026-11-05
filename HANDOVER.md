@@ -306,6 +306,11 @@ python tools/externalize_images.py             # 实际执行
 
 结论：**迁移公告完全发得出去**，因为它属于「内容」层；旧链接不下线不构成障碍。
 
+> ⚠️ **但"原链接公告不影响新链接"需要解耦**：v85+ 新旧链接默认读同一份 GitHub `content.json`，
+> 只覆盖 GitHub 会让公告**也**出现在新链接上。要让原链接内容真正独立，须关掉原链接
+> `store.js` 的 `crossCheckGithub()` 后用**旧 appId 重部署**（详见
+> `路径二-新链接替换原链接执行手册.md` Phase 2）。这一步由助理在用户授权下执行，非工具自动。
+
 ### 迁移公告怎么落地（推荐顺序）
 1. 在 `content.json` 里：`config.updateNotice.enabled = true`，标题/正文写迁移说明，
    `buttonText` 改「前往新地址」，`buttonUrl` 指向**新链接的引导页**；
