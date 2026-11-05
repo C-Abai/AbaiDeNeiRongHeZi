@@ -543,12 +543,16 @@
     }
 
     // 「强制提示更新」：单独折叠卡片，避免站点设置面板过长
+    // 老配置没有 closeOpacity 字段 → 默认 100（关闭按钮完全可见）
+    const nCloseVal = n.closeOpacity == null ? 100
+      : Math.max(0, Math.min(100, Math.round(Number(n.closeOpacity) || 0)));
     const noticeInner = '<div class="sub">📢 进入即弹窗（公开端首页 / 手机 APP 首页）</div>'
       + '<div class="checkbox-row"><label class="switch"><input type="checkbox" id="n_enabled" ' + (n.enabled ? 'checked' : '') + '/><span class="slider"></span></label><label for="n_enabled">启用强制提示（默认关闭；开启后访客进入即看到）</label></div>'
       + '<div class="field"><label>展示方式</label><select id="n_mode">'
-      + '<option value="fullscreen"' + (n.mode !== 'bubble' ? ' selected' : '') + '>强制全屏（居中遮罩，默认无关闭按钮）</option>'
-      + '<option value="bubble"' + (n.mode === 'bubble' ? ' selected' : '') + '>气泡卡片（左上角，带关闭按钮）</option>'
+      + '<option value="fullscreen"' + (n.mode !== 'bubble' ? ' selected' : '') + '>强制全屏（遮罩盖满整个屏幕，内容居中）</option>'
+      + '<option value="bubble"' + (n.mode === 'bubble' ? ' selected' : '') + '>气泡卡片（屏幕中上位置弹下来）</option>'
       + '</select></div>'
+      + '<div class="field"><label>关闭按钮显示度：<span id="n_close_v">' + nCloseVal + '</span> %（100 = 清晰可见，0 = 完全不显示；无论数值多少，屏幕右上角那块 40×40 区域始终可点击关闭）</label><input type="range" id="n_close" min="0" max="100" value="' + nCloseVal + '"/></div>'
       + '<div class="field"><label>弹窗主题</label><select id="n_theme">'
       + '<option value="auto"' + (n.theme !== 'light' && n.theme !== 'dark' ? ' selected' : '') + '>跟随站点（浅色 / 暗调自动适配）</option>'
       + '<option value="light"' + (n.theme === 'light' ? ' selected' : '') + '>强制浅色</option>'
@@ -562,8 +566,8 @@
       + '<div class="field"><label>引导按钮文案</label><input type="text" id="n_btn_text" value="' + esc(n.buttonText || '') + '" placeholder="如：前往更新"/></div>'
       + '<div class="field"><label>引导按钮链接（更新网页 / 下载页，需以 http(s):// 开头）</label><input type="text" id="n_btn_url" value="' + esc(n.buttonUrl || '') + '" placeholder="https://..."/></div>'
       + '<div class="checkbox-row"><input type="checkbox" id="n_every" ' + (n.everyTime !== false ? 'checked' : '') + '/><label for="n_every">每次进入都弹出（关闭则同一内容只弹一次）</label></div>'
-      + '<div class="n-warn">⚠️ 全屏模式默认不显示关闭按钮，请务必填写「引导按钮链接」，否则访客会被弹窗挡住；未填链接时系统会自动补一个关闭按钮兜底。</div>'
-      + '<div class="n-mini-box"><div class="n-mini-lbl">实时效果预览（与公开端「👁 预览」同步渲染）</div><div id="n_mini"></div></div>'
+      + '<div class="n-warn">ℹ️ 两种展示方式都在<strong>屏幕右上角</strong>带关闭按钮。显示度调到 0 只会让按钮隐形，不会移除点击区域，点右上角仍然可以关闭，不会把访客锁住。</div>'
+      + '<div class="n-mini-box"><div class="n-mini-lbl">实时效果预览（与公开端「👁 预览」同步渲染；位置与弹出动画请在右侧预览 / 后台全屏预览里看）</div><div id="n_mini"></div></div>'
       + '<p class="help">改完点下方「保存设置」写入本机草稿，再到顶部「发布」推上线后所有设备可见。编辑时右上角「👁 预览」也会实时显示弹窗效果。</p>';
 
     panel.innerHTML = '<div class="admin-list">'
@@ -644,11 +648,14 @@
         icon: noticeIcon,
         buttonText: $('#n_btn_text').value.trim(),
         buttonUrl: ($('#n_btn_url').value || '').trim(),
+        closeOpacity: Math.max(0, Math.min(100, parseInt($('#n_close').value, 10) || 0)),
         everyTime: $('#n_every').checked
       };
     }
     function syncNoticeDraft(applyToContent) {
       const cfg = noticeFormCfg();
+      const cv = $('#n_close_v');
+      if (cv) cv.textContent = cfg.closeOpacity;
       const mini = $('#n_mini');
       if (mini && window.CBNotice) mini.innerHTML = window.CBNotice.html(cfg, { force: true, inline: true, preview: true });
       // 初始化只画预览，不把「看了一眼设置」误当成改动写进草稿
@@ -656,7 +663,7 @@
       if (content && content.config) content.config.updateNotice = cfg;
       pushPreview();
     }
-    ['n_enabled', 'n_mode', 'n_theme', 'n_accent', 'n_title', 'n_text', 'n_btn_text', 'n_btn_url', 'n_every'].forEach(function (id) {
+    ['n_enabled', 'n_mode', 'n_theme', 'n_accent', 'n_title', 'n_text', 'n_btn_text', 'n_btn_url', 'n_every', 'n_close'].forEach(function (id) {
       const el = $('#' + id);
       if (!el) return;
       const onEdit = function () { syncNoticeDraft(true); };

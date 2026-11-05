@@ -344,4 +344,15 @@ git diff --stat HEAD origin/main                   # 其他文件差异摘要
 - **验证**：5 个 JS 文件 `node --check` 全过、CSS 括号平衡；用 vm 模拟 DOM 跑 `CBNotice` 18 项边界测试全过（全屏防锁死、XSS 转义、非法链接丢弃、inline 预览不产生浮层等）；后台表单 `n_*` id 与代码引用完全一致；线上 sw=v80 / `&v=80` / `js/notice.js` 200 / 三页均引入 / 后台双参数地址 200 / content.json 三端一致。提交 `e70c342` 已推 GitHub 并重新部署（appId 与链接不变）。
 - **⚠️ 上线生效路径**：弹窗**默认关闭**，`content.json` 里没有 `updateNotice` 字段。后台「保存设置」只写本机草稿，此时「👁 预览」和「👁 在后台全屏预览」能立刻看到效果；**要让所有访客 / 手机 APP 真正弹出，必须走「发布」tab 推上线（需 PAT），或让助手把配置同步进 content.json 后重新部署**。
 
+## 2026-11-05 补充：更新弹窗关闭按钮与两种模式布局修订（v81）
+
+- **用户两轮纠正**：① 全屏展示与气泡卡片**都要有关闭按钮**，按钮统一放**右上角**；后台增加「关闭按钮显示度」，最低可设为不显示，但**右上角那个位置点击仍然可以关闭**。② 明确布局定义：「全屏展示是**覆盖整个屏幕，内容居中而已**」（不是卡片撑满屏）；「气泡卡片弹出模式是**屏幕中上位置弹下来一个气泡卡片**」（不是 v80 的左上角贴边卡片）。
+- **数据结构**：`config.updateNotice` 新增 `closeOpacity`（0–100，**缺省 100**）。`js/notice.js` 的 `norm()` 钳制数值并回退非法值到 100；渲染时只写 inline `opacity`。
+- **关闭按钮实现**：`closeHtml(c)` 生成 `<button class="upd-close" data-upd-close style="opacity:X">`，**与卡片并列**作为 `.upd-mask` 的直接子元素；CSS `position:fixed; top:max(12px, env(safe-area-inset-top)); right:12px; width/height:40px; pointer-events:auto`，两种模式位置完全一致。删除 v80 的 `closable` 条件与「未填 buttonUrl 才补关闭」兜底——现在两种模式无条件都有关闭按钮。全屏遮罩用白色 × + 半透明黑圆底，气泡无遮罩用浅色圆底深字，暗调 / `dark` 主题另有覆盖色。
+- **气泡布局**：`.upd-bubble .upd-card` 改为 `top:max(10vh, safe-area+32px); left:50%; transform:translateX(-50%); max-width:340px`，加 `@keyframes updDrop`（从 `translate(-50%,-36px) scale(.96)` 滑入，0.42s）。全屏遮罩保持 `inset:0` + flex 居中，未改动。
+- **后台**：`noticeInner` 增加 `#n_close` 滑块与 `#n_close_v` 实时数值，`noticeFormCfg()` 收集并钳制，`syncNoticeDraft()` 同步数值到标签，监听数组加入 `n_close`；展示方式文案改为「遮罩盖满整个屏幕，内容居中 / 屏幕中上位置弹下来」；原来的「⚠️ 全屏无关闭按钮会锁死访客」警告改为「ℹ️ 右上角恒有关闭热区」说明。
+- **inline 小预览陷阱**：右上角按钮是 `position:fixed`，后台设置卡片里的缩小预览必须靠 `.upd-inline-preview { position:relative }` + `.upd-inline-preview .upd-close { position:absolute; ... }` 覆盖，否则 × 会飘到整个后台页面右上角盖住「👁 预览」按钮。
+- **版本**：SW `contentbox-v81`，`js/app.js` 注册 `&v=81`，`meta.json` = `{"contentHash":"v81-notice-close-20261105","sw":"contentbox-v81"}`（content.json 本身未改）。
+- **验证**：5 个 JS 文件 `node --check` 全过、CSS 括号平衡、`n_*` 表单 id 与引用一致；vm 模拟 DOM 跑 32 项测试全过（两种模式均有 ×、未填链接也有 ×、显示度 0 仍保留节点与热区、负数/超界/非法值钳制、老配置缺省 100、点右上角可卸载、XSS 转义、CSS 定位与动画存在）。
+
 *本手册由助手在 v69 发布后整理并更新，作为跨设备恢复上下文使用。*

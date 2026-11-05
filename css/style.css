@@ -1078,10 +1078,18 @@ body.admin-dark .chat-seg-ta { background: #20242b; color: #e6e8eb; border-color
   -webkit-backdrop-filter: blur(var(--card-blur, 0px)); backdrop-filter: blur(var(--card-blur, 0px));
   pointer-events: auto;
 }
+/* 气泡：屏幕中上位置，从上方弹下来（水平居中，不占满屏幕，背景可见） */
 .upd-bubble .upd-card {
-  position: fixed; top: max(12px, env(safe-area-inset-top)); left: 12px;
-  max-width: 320px; width: calc(100vw - 24px); padding: 20px 18px 18px;
+  position: fixed;
+  top: max(10vh, calc(env(safe-area-inset-top) + 32px)); left: 50%;
+  transform: translateX(-50%);
+  max-width: 340px; width: calc(100vw - 32px); padding: 20px 18px 18px;
   border-radius: 16px; box-shadow: 0 12px 36px rgba(0,0,0,.20);
+  animation: updDrop .42s cubic-bezier(.22, 1.15, .36, 1) both;
+}
+@keyframes updDrop {
+  from { opacity: 0; transform: translate(-50%, -36px) scale(.96); }
+  to   { opacity: 1; transform: translate(-50%, 0) scale(1); }
 }
 .upd-icon { width: 72px; height: 72px; border-radius: 18px; object-fit: cover; display: block; margin: 0 auto 14px; box-shadow: 0 6px 18px rgba(0,0,0,.12); }
 .upd-title { font-size: 20px; font-weight: 700; margin: 0 0 10px; line-height: 1.4; }
@@ -1093,26 +1101,46 @@ body.admin-dark .chat-seg-ta { background: #20242b; color: #e6e8eb; border-color
 }
 .upd-btn:active { transform: scale(.98); }
 .upd-btn:disabled { cursor: default; opacity: .95; }
+/* 关闭按钮：全屏 / 气泡统一固定在视口右上角，40×40 点击热区恒定。
+   显示度由 inline opacity 控制（0 = 隐形但仍可点），绝不能用 display/visibility/pointer-events 隐藏。 */
 .upd-close {
-  position: absolute; top: 8px; right: 10px; width: 30px; height: 30px;
-  border: none; background: transparent; color: var(--muted, #8a8f99);
-  font-size: 24px; line-height: 1; cursor: pointer; border-radius: 50%;
+  position: fixed; z-index: 10001;
+  top: max(12px, env(safe-area-inset-top)); right: 12px;
+  width: 40px; height: 40px; padding: 0;
+  display: flex; align-items: center; justify-content: center;
+  border: none; border-radius: 50%; cursor: pointer;
+  font-size: 26px; line-height: 1;
+  background: rgba(0,0,0,.30); color: #fff;
+  -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
+  pointer-events: auto;
 }
-.upd-close:hover { background: rgba(0,0,0,.06); }
+.upd-close:hover { filter: brightness(1.18); }
+.upd-close:active { transform: scale(.94); }
+/* 全屏：深色遮罩上用白字 + 半透明黑圆底 */
+.upd-full .upd-close { background: rgba(0,0,0,.30); color: #fff; box-shadow: 0 2px 12px rgba(0,0,0,.18); }
+/* 气泡：无遮罩，浅色圆底深字，任意壁纸上都看得清 */
+.upd-bubble .upd-close { background: rgba(255,255,255,.88); color: #4a525d; box-shadow: 0 3px 14px rgba(0,0,0,.16); }
+.upd-mask.upd-bubble.upd-dark .upd-close,
+body.dim .upd-mask.upd-bubble.upd-auto .upd-close { background: rgba(38,42,52,.92); color: #eaedf1; }
 
 /* 明暗：auto 跟随 body.dim；light / dark 强制覆盖 */
 body.dim .upd-mask.upd-auto .upd-card { background: rgba(24,27,36,.94); color: #eaedf1; border-color: rgba(255,255,255,.14); }
-body.dim .upd-mask.upd-auto .upd-text, body.dim .upd-mask.upd-auto .upd-close { color: #a9b0bb; }
+body.dim .upd-mask.upd-auto .upd-text { color: #a9b0bb; }
 .upd-mask.upd-light .upd-card, .upd-inline-preview.upd-light .upd-card { background: #fff; color: #1f2329; border-color: #ebedf0; }
-.upd-mask.upd-light .upd-text, .upd-mask.upd-light .upd-close,
-.upd-inline-preview.upd-light .upd-text { color: #8a8f99; }
+.upd-mask.upd-light .upd-text, .upd-inline-preview.upd-light .upd-text { color: #8a8f99; }
 .upd-mask.upd-dark .upd-card, .upd-inline-preview.upd-dark .upd-card { background: #1e222a; color: #eaedf1; border-color: rgba(255,255,255,.14); }
-.upd-mask.upd-dark .upd-text, .upd-mask.upd-dark .upd-close,
-.upd-inline-preview.upd-dark .upd-text { color: #a9b0bb; }
+.upd-mask.upd-dark .upd-text, .upd-inline-preview.upd-dark .upd-text { color: #a9b0bb; }
 
 /* 后台「站点设置」里的缩小预览（不产生 fixed 浮层） */
-.upd-inline-preview { display: flex; justify-content: center; padding: 8px; }
+.upd-inline-preview { position: relative; display: flex; justify-content: center; padding: 8px; }
 .upd-inline-preview .upd-card { position: relative; max-width: 300px; box-shadow: 0 6px 20px rgba(0,0,0,.12); }
+/* 后台缩小预览里不能让右上角按钮 fixed 飘到整个页面，改为相对预览框定位 */
+.upd-inline-preview .upd-close {
+  position: absolute; top: 10px; right: 10px; width: 28px; height: 28px;
+  font-size: 20px; background: rgba(127,127,127,.14); color: var(--muted, #8a8f99);
+  box-shadow: none; -webkit-backdrop-filter: none; backdrop-filter: none;
+}
+body.admin-dark .upd-inline-preview .upd-close { background: rgba(255,255,255,.12); color: #aeb6c2; }
 .n-mini-box { background: #f6f8fa; border: 1px solid #e3e8ee; border-radius: 12px; padding: 10px; margin: 10px 0; min-height: 90px; }
 .n-mini-box .n-mini-lbl { font-size: 12px; color: #8a9099; margin-bottom: 6px; }
 .n-warn { font-size: 12px; color: #a86a00; line-height: 1.7; background: #fff8e8; border-radius: 8px; padding: 8px 10px; margin: 8px 0; }
