@@ -150,6 +150,46 @@ git diff --stat HEAD origin/main                   # 其他文件差异摘要
 
 ---
 
+## 4b. 图片外置工具（改图后把 content.json 瘦回 20KB）
+
+**在后台改图片会让 `content.json` 变大，但不会让同步失效。** 后台「重传封面 / 换壁纸 / 换图标」
+时，图片经 `CBStore.fileToResizedDataURL()` 压成**内联 base64** 写进 `content.json`
+（默认 1000px / 0.82，壁纸 1400px / 0.8）。改 1 张约 +100–200KB，跨境同步从约 1 秒
+变成约 1.5–3 秒；改很多张会一路回到瘦身前的十几秒。
+
+- **新图是内联的 → 只覆盖 `content.json` 照样同步**，不依赖 `assets/`、不需要部署。
+- **已外置的 17 张老图**在后台编辑时原样保留（`coverData = d.cover || ''`），线上文件也一直在，
+  只覆盖 `content.json` 动不到它们，**不会破图**。
+- 唯一体感差异：文件变大后同步慢一点；刚覆盖完还有 raw 的 `max-age=300` CDN 窗口（最多 5 分钟）。
+
+想恢复 20KB，用仓库里的幂等工具（无第三方依赖，Python 3.7+；Windows 用 `python` 或 `python3`）：
+
+```bash
+python tools/externalize_images.py --dry-run   # 先看会做什么，不写任何文件
+python tools/externalize_images.py             # 实际执行
+```
+
+流程：后台改图 → 「发布」tab 导出 `content.json` 覆盖到项目根 → 跑脚本 → 脚本把内联图按
+内容哈希落盘成 `assets/img-<hash>.jpg`，字段值换成
+`assets/img-<hash>.jpg?sharecode=AK6QIELR67`（可直接当 `src` 用，**零渲染代码改动**）。
+
+- ⚠️ **只要生成了新图片文件，就必须重新部署一次**让 `assets/` 上线，再把瘦身后的
+  `content.json` 推到 GitHub。**只推 content.json 不部署 → 访客拿到指向不存在图片的引用 → 破图**。
+  脚本会在输出里醒目警告并列出新文件名；没新增图片时则明确告诉你「无需部署」。
+- 幂等：重复运行不重复生成、不改已外置路径；同一张图被多处引用只落盘一次；命中已有同内容图直接复用。
+- 常用参数：`--sharecode NEWCODE`（换链接时重签全部 18 处图片引用）、`--verify`（只校验图片齐全、
+  不写文件）、`--backup`（写 `content.json.bak`）、`--content` / `--assets` / `--root`（自定义路径）。
+- ⚠️ `--sharecode` **只改图片路径**。`content.json` 里另有 5 处非图片 URL 含旧门禁码
+  （`config.apkUrl`、`config.guide.apkUrl`、`config.updateNotice.buttonUrl`、`links[].url`、作者官网），
+  换链接时按 §5d 单独替换，脚本会提醒。
+- 回滚：`git checkout -- content.json`（或用 `--backup` 的 .bak）。脚本**不动 `meta.json`**。
+- 注：从后台导出的 `JSON.stringify` 格式会被脚本重新序列化成 Python `indent=2` 格式，
+  git diff 会显示整文件变化，但**内容语义完全不变**。
+
+> 一句话：**改 1–3 张图直接覆盖仓库就行，不用跑工具；改得多、想恢复秒级同步时再跑工具 + 部署一次。**
+
+---
+
 ## 5. 改代码 / 部署（界面优化、加功能时）
 
 - 部署能力：`workbuddy_sites_deploy`（本平台「发布」能力）。
@@ -279,7 +319,10 @@ git diff --stat HEAD origin/main                   # 其他文件差异摘要
     关于页后台入口 `admin-mini`（当前仍是单参数 `admin.html?key=...`，应补 sharecode）
   - `js/admin.js`：`PUBLIC_ORIGIN`、`DEFAULT_INSTALL_URL`、两处预览 iframe URL、`fetch('sw.js?...')`
   - `content.json`：`apkUrl`、`author.intro` 官网、links 里的旧域名、引导页配置里的地址，
-    **以及 18 处外置图片路径 `assets/img-*.jpg?sharecode=AK6QIELR67`（v87 起新增，漏改会全部 404）**
+    以及 5 处非图片 URL 里的 `?sharecode=AK6QIELR67`（官网 / apkUrl / buttonUrl / links 地址）
+  - **18 处外置图片路径 `assets/img-*.jpg?sharecode=AK6QIELR67`**（v87 起新增，漏改全部 404）：
+    用 `python tools/externalize_images.py --sharecode <新码>` 一键重签，见 §4b；
+    脚本只改图片路径，会提醒剩余 5 处非图片 URL 需手动替换
 - **`assets/` 目录（17 张图，约 927KB）必须随项目一起 clone / 部署**，否则所有封面、壁纸、图标全丢。
   图片文件名是内容哈希，不会变，只需替换 URL 里的 sharecode。
 - 改完**升 SW 版本号**：`sw.js` 的 CACHE / `meta.json` 的 sw / `js/app.js` 的 `&v=` 三处同号 +1。

@@ -11,3 +11,10 @@ meta.github.json
 .DS_Store
 Thumbs.db
 *.log
+
+# 图片外置工具（tools/externalize_images.py --backup）产生的备份
+*.bak
+
+# Python 编译缓存
+__pycache__/
+*.pyc
