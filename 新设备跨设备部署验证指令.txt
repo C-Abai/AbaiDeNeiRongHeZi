@@ -117,6 +117,9 @@ applications:
      meta.json 指纹门槛，公开端每次启动后台校验 GitHub 全量内容）；更稳是再重新部署一次旧 appId。
      界面 / 代码层只能重新部署旧 appId；旧 APK 内硬编码的 host 无法远程改，只能重新打包。
      注意新旧链接共用同一份 GitHub content.json，覆盖一次两边访客都会变。
+   - **v87 起 content.json 已瘦到约 20KB**（18 处图片外置到 `assets/img-*.jpg`，17 张图约 927KB）。
+     clone 或下载部署包时**务必确认 `assets/` 目录一起带上**，否则所有封面 / 壁纸 / 图标 404。
+     图片路径里写死了 `?sharecode=AK6QIELR67`，若迁移到新链接需全局替换这 18 处。
 5. 切新链接的代码改动清单、APK 重打包签名前提、GitHub 内容共享坑，
    详见仓库 HANDOVER.md §5d，**执行迁移前务必先读**。
 

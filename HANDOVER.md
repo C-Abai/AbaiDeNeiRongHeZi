@@ -41,10 +41,25 @@
   `meta.json` 的 `contentHash` 现在只是后台发布时写的兼容字段（旧版客户端仍读它），已不参与判定。
 - 托管平台的 `./content.json` **不会**随 GitHub 发布而变，只有助手重新部署才更新；
   v85 起 GitHub 版更新后会在客户端覆盖它，故两边长期不一致也不影响同步。
-- ⏱ **刚覆盖仓库后不会「秒变」**（2026-11-05 实测）：raw 的 CDN 有 `Cache-Control: max-age=300`
-  （最多 5 分钟旧副本），且 1.28MB 跨境全量下载实测 **无压缩 24.6s / gzip 11s**，浏览器自动带压缩头。
-  因此访客常要「重开 App 后等约 10–25 秒」，或等 5 分钟 CDN 过期后再重开一次才看到新版。
-  **要让所有访客立刻看到，仍是重新部署一次**（把新版 content.json 写进托管快照，同域约 2.6s 即返回）。
+- 🚀 **【v87 图片外置 / 性能根治】`content.json` 已从 1.28MB 瘦到约 20KB**：
+  原文件 98.5% 是 18 处内嵌 base64 图片（17 张唯一图，964KB 二进制），改文字却要重下整包图片，
+  这才是「覆盖仓库后要等十几秒」的真正原因。现在图片解码后以内容哈希命名存入 `assets/img-<sha12>.<ext>`，
+  `content.json` 里对应字段直接写成**可作为 `src` 用的相对路径**
+  `assets/img-xxxx.jpg?sharecode=AK6QIELR67`（带门禁参数，托管平台可直接返回图片）。
+  - **零渲染代码改动**：公开端 `<img src>`、`store.js` 的 `applyTheme()` CSS `url()`、
+    `notice.js` 弹窗图标、后台封面预览、引导页图标都是直接拿字段值当 URL，相对路径天然可用。
+  - **画质完全不变**（原图二进制原样落盘），用户工作流也不变：后台加载到的就是路径字符串，
+    改完文字导出 → 仍是 ~20KB 的单个 `content.json` → 覆盖仓库即可。
+  - **混合模式兼容新图**：以后在后台新上传的图片仍是 `data:image/...;base64`（一张约 120KB），
+    与外置路径共存，无需额外操作；只有老图被外置。
+  - `assets/` 必须随项目一起部署（进 GitHub 仓库）；图片走 SW 的 `cacheFirst`，首次访问后离线可用。
+  - ⚠️ 切新链接时，除 §5d 清单外还要把 `content.json` 里 18 处 `?sharecode=AK6QIELR67` 全局换成新 sharecode。
+- ⏱ **性能对照（2026-11-05 实测）**：瘦身前 raw 全量 1.28MB = 无压缩 24.6s / gzip 11s，
+  同域 2.6s，且 raw CDN 有 `Cache-Control: max-age=300`（最多 5 分钟旧副本），
+  所以旧版常要等 10–25 秒甚至超时失败。瘦身后全量仅 ~20KB，跨境往返毫秒级，
+  304 条件请求 0.4s；刷新 / 同步 / 引导页都不再受大文件拖累，首屏仍是 localStorage 缓存 1ms 绘制。
+  **但若托管端 `./content.json` 还是旧的大文件，每次启动仍要下那 1.28MB**，
+  故本次改动仍需重新部署一次，把 20KB 版 + `assets/` 一起写进托管快照。
 
 > 一句话记住：**改内容 = 把 `content.json` 覆盖到 GitHub（单个文件即可）；改代码 / 界面 = 改项目文件再部署。**
 > （v79~v84 曾要求「同时改 `meta.json.contentHash` 指纹」，v85 已取消该门槛；
@@ -252,17 +267,21 @@ git diff --stat HEAD origin/main                   # 其他文件差异摘要
    这条链路可远程改，不需要动旧 APK。
 3. 让公告覆盖所有旧访客：最稳是**重新部署一次旧 appId**，把公告版 content.json 写进旧链接托管。
    v86 起只推 GitHub 也能同步（45s 后台全量校验 + 失败重试一次 + 来源优先级，不会被旧快照冲掉）；
-   但国内访问 raw 仍可能超时、CDN 还有 5 分钟缓存窗口，重新部署可保证 100% 即时覆盖。
+   v87 图片外置后 `content.json` 仅 ~20KB，跨境同步已在 1 秒内，但托管端若仍是旧的大快照，
+   每次启动仍要下 1.28MB，故重要公告仍建议重新部署一次对齐两侧。
 4. 新链接侧同步部署代码，并按下面清单改完再发布。
 
 ### 切到新链接的代码改动清单（新链接的 sharecode 很可能不同！）
 - `SC` 在 `store.js` / `admin.js` / `guide.html` 中是「优先读 URL 参数，缺省回落 `AK6QIELR67`」，
   故数据请求会自动适配；但以下**写死**处必须全局替换成新域名 + 新 sharecode：
   - `index.html` / `admin.html` / `preview.html` / `download.html` / `manifest.webmanifest` 里所有 `?sharecode=AK6QIELR67`
-  - `js/app.js`：SW 注册 `sw.js?sharecode=...&v=84`、`aboutQrUrl`、`ensureScript` 的 js 路径、
+  - `js/app.js`：SW 注册 `sw.js?sharecode=...&v=85`、`aboutQrUrl`、`ensureScript` 的 js 路径、
     关于页后台入口 `admin-mini`（当前仍是单参数 `admin.html?key=...`，应补 sharecode）
   - `js/admin.js`：`PUBLIC_ORIGIN`、`DEFAULT_INSTALL_URL`、两处预览 iframe URL、`fetch('sw.js?...')`
-  - `content.json`：`apkUrl`、`author.intro` 官网、links 里的旧域名、引导页配置里的地址
+  - `content.json`：`apkUrl`、`author.intro` 官网、links 里的旧域名、引导页配置里的地址，
+    **以及 18 处外置图片路径 `assets/img-*.jpg?sharecode=AK6QIELR67`（v87 起新增，漏改会全部 404）**
+- **`assets/` 目录（17 张图，约 927KB）必须随项目一起 clone / 部署**，否则所有封面、壁纸、图标全丢。
+  图片文件名是内容哈希，不会变，只需替换 URL 里的 sharecode。
 - 改完**升 SW 版本号**：`sw.js` 的 CACHE / `meta.json` 的 sw / `js/app.js` 的 `&v=` 三处同号 +1。
 
 ### APK 重新打包的两个硬前提
