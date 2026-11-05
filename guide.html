@@ -198,13 +198,20 @@
         var ghApplied = false;
         // 后台校验 GitHub 全量：只覆盖仓库 content.json 也能同步 apkUrl / 引导文案，
         // 不需要改 meta.json 指纹、也不需要重新部署。内容有变化才重绘。
-        fetchGithub(20000).then(function (data) {
-          ghApplied = true;
-          var raw = JSON.stringify(data);
-          try { if (raw === localStorage.getItem(CACHE_KEY)) return; } catch (e) {}
-          cacheIt(data);
-          render(data);
-        }).catch(function () {});
+        // 【v86】45s 长超时 + 失败静默重试一次：1.28MB 跨境实测可达 24.6s，
+        // 旧版 20s 会把刚覆盖的内容丢掉。成功时不重复请求，全程后台不影响首屏。
+        function attempt(left) {
+          fetchGithub(45000).then(function (data) {
+            ghApplied = true;
+            var raw = JSON.stringify(data);
+            try { if (raw === localStorage.getItem(CACHE_KEY)) return; } catch (e) {}
+            cacheIt(data);
+            render(data);
+          }).catch(function () {
+            if (left > 0) setTimeout(function () { attempt(left - 1); }, 2000);
+          });
+        }
+        attempt(1);
         // 同域快渲染；GitHub 新版若已先落地，忽略随后到达的托管旧快照，避免内容被冲回旧版。
         loadJson(LOCAL, 6000)
           .then(function (data) {

@@ -19,8 +19,9 @@
   const GITHUB_CONTENT_URL = 'https://raw.githubusercontent.com/C-Abai/AbaiDeNeiRongHeZi/refs/heads/main/content.json';
   const LOCAL_MS = 6000;       // 同域请求超时上限（正常网络毫秒级返回）
   const REMOTE_MS = 2500;      // 首屏兜底用的短超时（快速失败，绝不拖住首屏 / 登录）
-  const REMOTE_FULL_MS = 20000;// 【v85】GitHub 全量 1.28MB 跨境实测可达 20s+；
-                               // 但这条链路纯后台 fire-and-forget，给足时间也不影响首屏秒开。
+  const REMOTE_FULL_MS = 45000;// 【v86】GitHub 全量 1.28MB 跨境实测：无压缩 24.6s、gzip 11s，
+                               // 20s 超时会把刚覆盖的新内容直接丢掉（用户看到「改了没反应」）。
+                               // 放宽到 45s；这条链路纯后台 fire-and-forget，给足时间也不影响首屏秒开。
 
   function withBust(url) { return url + (url.indexOf('?') >= 0 ? '&' : '?') + '_h=' + Date.now(); }
 
@@ -193,9 +194,16 @@
   // 手动覆盖仓库 content.json 时用户不会去改 meta.json，旧逻辑会直接跳过、内容永远不更新。
   // 不参与首屏 await；GitHub 不可达 / 超时时静默忽略，同域内容照常可用。
   function crossCheckGithub(opts, ctx) {
-    fetchGithubContent(REMOTE_FULL_MS)
-      .then(function (fresh) { applyFresh(fresh, opts, ctx, 'github'); })
-      .catch(function () {});
+    // 跨境链路抖动常见（TLS 失败 / 中途断流）。仅失败时静默重试一次，成功绝不重复请求，
+    // 也不会额外产生 1.28MB 流量；重试同样在后台，不参与首屏 / 登录等待。
+    function attempt(left) {
+      fetchGithubContent(REMOTE_FULL_MS)
+        .then(function (fresh) { applyFresh(fresh, opts, ctx, 'github'); })
+        .catch(function () {
+          if (left > 0) setTimeout(function () { attempt(left - 1); }, 2000);
+        });
+    }
+    attempt(1);
   }
 
   function safeParse(s) {
