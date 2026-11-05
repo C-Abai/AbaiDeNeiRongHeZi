@@ -86,7 +86,7 @@
   }
 
   // 从 URL 取分享码，用于拉取线上最新内容时带上
-  const SC = (function () { try { return new URLSearchParams(location.search).get('sharecode') || 'AK6QIELR67'; } catch (e) { return 'AK6QIELR67'; } })();
+  const SC = (function () { try { return new URLSearchParams(location.search).get('sharecode') || 'LXZ6WX2ERL'; } catch (e) { return 'LXZ6WX2ERL'; } })();
 
   // 带超时的 fetch：GitHub raw 跨境可能 20s+，绝不能让后台登录无限等待
   function fetchWithTimeout(url, opts, ms) {
@@ -151,7 +151,7 @@
     document.getElementById('previewClose').onclick = closePreview;
     document.getElementById('previewRefresh').onclick = function () {
       previewReady = false;
-      document.getElementById('previewFrame').src = 'preview.html?sharecode=AK6QIELR67&preview=1&pv=1';
+      document.getElementById('previewFrame').src = 'preview.html?sharecode=LXZ6WX2ERL&preview=1&pv=1';
     };
   }
   function openPreview() {
@@ -162,7 +162,7 @@
     ov.classList.add('show');
     const f = document.getElementById('previewFrame');
     if (!f.src || f.src.indexOf('preview.html') < 0) {
-      f.src = 'preview.html?sharecode=AK6QIELR67&preview=1&pv=1';
+      f.src = 'preview.html?sharecode=LXZ6WX2ERL&preview=1&pv=1';
     }
   }
   function closePreview() {
@@ -175,9 +175,9 @@
   const ADMIN_KEY = 'nebadmin2026';
   // 正式站点根地址：后台可能在本地 / 预览容器（127.0.0.1:端口）里打开，
   // 对外链接一律用这个固定域名，绝不能用 location.origin 拼，否则显示/复制出去的是无效本地地址。
-  const PUBLIC_ORIGIN = 'https://content-box-24323.app.workbuddy.host';
+  const PUBLIC_ORIGIN = 'https://2118301017820069888.app.workbuddy.host';
   // 已部署的引导页（兜底默认值，仅当用户未自行填写时填入后台输入框；可随时在后台修改）
-  const DEFAULT_INSTALL_URL = PUBLIC_ORIGIN + '/guide.html?sharecode=AK6QIELR67';
+  const DEFAULT_INSTALL_URL = PUBLIC_ORIGIN + '/guide.html?sharecode=LXZ6WX2ERL';
   if (new URLSearchParams(location.search).get('key') !== ADMIN_KEY) {
     app.innerHTML = '<div style="padding:80px 20px;text-align:center;color:#bbb;font-size:14px">404 · 页面不存在</div>';
     return;
@@ -1423,7 +1423,7 @@
     const runEl = document.getElementById('sw_running');
     const timeEl = document.getElementById('sw_time');
     if (onlineEl) {
-      fetch('sw.js?sharecode=AK6QIELR67&pv=1').then(function (r) { return r.text(); }).then(function (t) {
+      fetch('sw.js?sharecode=LXZ6WX2ERL&pv=1').then(function (r) { return r.text(); }).then(function (t) {
         const m = t.match(/const\s+CACHE\s*=\s*['"]([^'"]+)['"]/);
         onlineEl.textContent = m ? m[1] : '未知';
         if (timeEl) timeEl.textContent = '最近读取：' + new Date().toLocaleString('zh-CN');

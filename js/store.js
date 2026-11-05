@@ -7,8 +7,8 @@
   // 【v79 关键修复】托管平台所有静态资源必须带 sharecode 门禁参数，否则返回「链接不完整」HTML，
   // 旧版 './content.json' / './meta.json' 不带门禁 → 所有同域兜底请求其实都拿到 HTML 而静默失败。
   const SC = (function () {
-    try { return new URLSearchParams(location.search).get('sharecode') || 'AK6QIELR67'; }
-    catch (e) { return 'AK6QIELR67'; }
+    try { return new URLSearchParams(location.search).get('sharecode') || 'LXZ6WX2ERL'; }
+    catch (e) { return 'LXZ6WX2ERL'; }
   })();
   function gate(u) { return u + (u.indexOf('?') >= 0 ? '&' : '?') + 'sharecode=' + encodeURIComponent(SC); }
   const CONTENT_URL = gate('./content.json');
@@ -20,7 +20,7 @@
   // 【解耦开关】旧链接已脱离 GitHub：置 false 后不再向 GitHub 拉取全量内容，
   // 只读取本托管端部署的 ./content.json 快照（首屏秒开仍由 refreshFromLocal 保证）。
   // 新链接迁移工具 migrate_to_new_link.py 会把它改回 true，恢复「覆盖仓库 content.json 即同步」的玩法。
-  const USE_GITHUB_SYNC = false;
+  const USE_GITHUB_SYNC = true;
   const LOCAL_MS = 6000;       // 同域请求超时上限（正常网络毫秒级返回）
   const REMOTE_MS = 2500;      // 首屏兜底用的短超时（快速失败，绝不拖住首屏 / 登录）
   const REMOTE_FULL_MS = 45000;// 【v86】GitHub 全量 1.28MB 跨境实测：无压缩 24.6s、gzip 11s，

@@ -9,7 +9,7 @@
       "bg": "#f5f6f8",
       "card": "#ffffff",
       "text": "#1f2329",
-      "wallpaper": "assets/img-561406cbb870.jpg?sharecode=AK6QIELR67",
+      "wallpaper": "assets/img-561406cbb870.jpg?sharecode=LXZ6WX2ERL",
       "wallpaperBlur": 0,
       "wallpaperOpacity": 70,
       "wallpaperFull": true,
@@ -70,9 +70,9 @@
     ],
     "author": {
       "name": "酷白.Abai",
-      "intro": "Ai做着玩\n因无☁️云端服务器，因此版本更新、新增内容可能需重新进入网页或从新下载最新安装包：目前测试手机端安装APP后重新进APP会自动刷新最新内容\n站点官网：https://content-box-24323.app.workbuddy.host/?sharecode=AK6QIELR67\n\n\n版本：26.10.31（1.9）v85\n开发:26.10.27.16.09.30"
+      "intro": "Ai做着玩\n因无☁️云端服务器，因此版本更新、新增内容可能需重新进入网页或从新下载最新安装包：目前测试手机端安装APP后重新进APP会自动刷新最新内容\n站点官网：https://2118301017820069888.app.workbuddy.host/?sharecode=LXZ6WX2ERL\n\n\n版本：26.10.31（1.9）v85\n开发:26.10.27.16.09.30"
     },
-    "apkUrl": "https://content-box-24323.app.workbuddy.host/guide.html?sharecode=AK6QIELR67",
+    "apkUrl": "https://2118301017820069888.app.workbuddy.host/guide.html?sharecode=LXZ6WX2ERL",
     "icon": "",
     "links": [
       {
@@ -81,7 +81,7 @@
         "url": "https://ol.woobx.cn/",
         "groupId": "g_pmvrqfjl8vety5",
         "description": "主用：图片格式/压缩/GIF/文本/视频//以图搜番/bilibili封面获取...等常用工具 更多可直接快捷打开后查看",
-        "icon": "assets/img-576f7fde25e8.jpg?sharecode=AK6QIELR67",
+        "icon": "assets/img-576f7fde25e8.jpg?sharecode=LXZ6WX2ERL",
         "order": 2,
         "showUrl": false
       },
@@ -91,7 +91,7 @@
         "url": "https://roar.iiilab.com/",
         "groupId": "g_pmvrqfjl8vety5",
         "description": "对内容进行文字加密，翻译转换成各种兽语，负责编码解密-加密兽语",
-        "icon": "assets/img-a5de44daa839.jpg?sharecode=AK6QIELR67",
+        "icon": "assets/img-a5de44daa839.jpg?sharecode=LXZ6WX2ERL",
         "order": 3,
         "showUrl": false
       },
@@ -100,7 +100,7 @@
         "title": "洛雪TV",
         "url": "https://tv.lxyy.club/",
         "description": "免费 | 支持4K的追剧网站 | 内置央视直播",
-        "icon": "assets/img-52e46a326a63.jpg?sharecode=AK6QIELR67",
+        "icon": "assets/img-52e46a326a63.jpg?sharecode=LXZ6WX2ERL",
         "groupId": "g_pmvta2f9k06b3q",
         "order": 2,
         "showUrl": false
@@ -110,7 +110,7 @@
         "title": "TvTFun",
         "url": "https://www.tvtfun.net/",
         "description": "专注日本动漫番剧的在线追番网站",
-        "icon": "assets/img-97e5aaa5e515.jpg?sharecode=AK6QIELR67",
+        "icon": "assets/img-97e5aaa5e515.jpg?sharecode=LXZ6WX2ERL",
         "groupId": "g_pmvta2f9k06b3q",
         "order": 3,
         "showUrl": false
@@ -118,7 +118,7 @@
       {
         "id": "pmvue752wmxfvk",
         "title": "Abai的内容盒子-官网",
-        "url": "https://content-box-24323.app.workbuddy.host/?sharecode=AK6QIELR67",
+        "url": "https://2118301017820069888.app.workbuddy.host/?sharecode=LXZ6WX2ERL",
         "description": "放个网页链接在这，以防忘记网页端",
         "icon": "",
         "order": 1
@@ -128,7 +128,7 @@
         "title": "小说搜索引擎",
         "url": "https://www.owlook.com.cn/",
         "description": "这是一个网络小说搜索引擎，同一本小说可能搜出多个渠道，推荐首个，部分渠道含广告",
-        "icon": "assets/img-2bc376cc4e5b.jpg?sharecode=AK6QIELR67",
+        "icon": "assets/img-2bc376cc4e5b.jpg?sharecode=LXZ6WX2ERL",
         "groupId": "g_pmvrqfjl8vety5",
         "order": 1,
         "showUrl": false
@@ -138,7 +138,7 @@
         "title": "魔力音乐",
         "url": "https://yy.juhuang.xyz/",
         "description": "支持五大平台曲库的在线音乐站点",
-        "icon": "assets/img-af399c0d9191.jpg?sharecode=AK6QIELR67",
+        "icon": "assets/img-af399c0d9191.jpg?sharecode=LXZ6WX2ERL",
         "groupId": "g_pmvta2f9k06b3q",
         "order": 1,
         "showUrl": false
@@ -148,7 +148,7 @@
         "title": "GitHub",
         "url": "https://github.com/",
         "description": "",
-        "icon": "assets/img-079014604478.jpg?sharecode=AK6QIELR67",
+        "icon": "assets/img-079014604478.jpg?sharecode=LXZ6WX2ERL",
         "order": 2
       }
     ],
@@ -171,9 +171,9 @@
       "title": "Abai的内容盒子",
       "subtitle": "版本：1.9",
       "intro": "部分手机系统开了安装包扫描引擎，故安装时会提示⚠️风险应用；因为个人开发没有应用商店授权所以会有提示。\n正常右上角授权安装即可(作者不会造病毒）",
-      "apkUrl": "https://content-box-24323.app.workbuddy.host/app.apk?sharecode=AK6QIELR67",
+      "apkUrl": "https://2118301017820069888.app.workbuddy.host/app.apk?sharecode=LXZ6WX2ERL",
       "buttonText": "下载最新1.9版本",
-      "icon": "assets/img-1941439296ea.png?sharecode=AK6QIELR67"
+      "icon": "assets/img-1941439296ea.png?sharecode=LXZ6WX2ERL"
     },
     "updateNotice": {
       "enabled": false,
@@ -182,9 +182,9 @@
       "accent": "#22c973",
       "title": "发现新版本（2.0）",
       "text": "Abai的内容盒子\n（2.0）v83",
-      "icon": "assets/img-b0545722a386.jpg?sharecode=AK6QIELR67",
+      "icon": "assets/img-b0545722a386.jpg?sharecode=LXZ6WX2ERL",
       "buttonText": "前往更新",
-      "buttonUrl": "https://content-box-24323.app.workbuddy.host/guide.html?sharecode=AK6QIELR67",
+      "buttonUrl": "https://2118301017820069888.app.workbuddy.host/guide.html?sharecode=LXZ6WX2ERL",
       "closeOpacity": 5,
       "everyTime": true
     }
@@ -196,7 +196,7 @@
       "category": "article",
       "summary": "一个由Ai配合构建的内容盒子，这里会有实用文章和热门工具，联网刷新即可同步。",
       "content": "这是一个用Ai配合执行构建的工具，当前处于测试阶段\n\n内容和黑科技工具的整合站，主要提供便捷寻找工具和内容，同时能当自己的网址 工具 内容收藏保存点\n\n后续会逐步尝试美化盒子，往这里新增内容、工具等，但由于这个站点是没有链接云端服务器的，从而如果作者新增内容或者更新版本，需要重新进入网页刷新，下载APP端的用户进入APP刷新即可同步，如有大版本更新可能需要从新下载最新安装包才能同步内容更新。\n\n同步方式：内容随站点静态文件部署更新发布——重开刷新站点或更新安装包即可同步。\n目前盒子已经提供APP形态，可在关于页面底部下载，下载不了就是还未同步打包或者下载直链出错，可联系作者反馈：\n\n如何联系作者：wx公众号：星海里找尘埃 \n直接私信或文字底部评论区反馈\n",
-      "cover": "assets/img-08aad14245e9.jpg?sharecode=AK6QIELR67",
+      "cover": "assets/img-08aad14245e9.jpg?sharecode=LXZ6WX2ERL",
       "pinned": true,
       "order": 8,
       "published": true,
@@ -220,7 +220,7 @@
       "category": "article",
       "summary": "安卓系统直接在关于页面底部点击一键安装即可，苹果设备点击后按指引保存到手机桌面即可",
       "content": "安卓系统直接在关于页面底部点击一键安装即可，苹果设备点击后按指引保存到手机桌面即可\n\n因打包的安装包是.APK直链，苹果系统不支持直接安装APK软件\n苹果系统解决方案：\n浏览器打开本页 > 点底部 [分享] 图标 > 添加到主屏幕，即可像APP一样使用\n\n因为本站点属于静态站点，下载后是静态包，后续作者更新内容重新部署后，可直接进入App刷新即可加载最新内容（如果没有更新，下载最新安装包覆盖即可）",
-      "cover": "assets/img-ac205a0d00c5.jpg?sharecode=AK6QIELR67",
+      "cover": "assets/img-ac205a0d00c5.jpg?sharecode=LXZ6WX2ERL",
       "pinned": false,
       "order": 1,
       "published": true,
@@ -241,7 +241,7 @@
       "category": "tech",
       "summary": "工具集合站 - 内置小工具在底部展开",
       "content": "有好的工具或工具站想要扩展到页面可联系作者提供.这里相当于大家的便捷工具站，可以集合好用的工具放置到这里，下次使用更为方便",
-      "cover": "assets/img-d46a15195662.jpg?sharecode=AK6QIELR67",
+      "cover": "assets/img-d46a15195662.jpg?sharecode=LXZ6WX2ERL",
       "pinned": true,
       "order": 0,
       "published": true,
@@ -259,7 +259,7 @@
       "category": "tech",
       "summary": "新增：小说搜索引擎、魔力音乐",
       "content": "v42\n新增：小说搜索引擎 \n这是一个网络小说搜索引擎，同一本小说可能搜出多个渠道，推荐首个，部分渠道含广告，广告谨慎点击！\n>已归纳到效率工具箱\n\n魔力音乐\n支持五大平台曲库的在线音乐站点，全部免费听且下载\n>已归纳到影视-音乐\n\nv39\n已增加类目收纳分类：影视-音乐、效率工具箱\n落雪TV：\n聚合国产影视动漫为主，内置含CCTV电视直播、在线解析影片工具等\n\nTvTFun:\n专注日本动漫追番站点，基本不含国内影视\n\nv19\n一个木函-多功能效率工具箱：\n主用方面：图片格式转换、压缩、GIF合成....文本工具，视频工具。查询工具：以图搜番、bilibili封面获取...等常用工具\n更多可直接快捷打开后查看\n\n兽音译者\n众所周知，对内容进行文字加密，翻译转换成各种兽语，负责编码解密-加密兽语\n可直接快捷打开官网\n\n第三方工具网内广告谨慎点击！",
-      "cover": "assets/img-d46a15195662.jpg?sharecode=AK6QIELR67",
+      "cover": "assets/img-d46a15195662.jpg?sharecode=LXZ6WX2ERL",
       "pinned": false,
       "order": 0,
       "published": true,
@@ -286,7 +286,7 @@
       "category": "article",
       "summary": "26.10.31（1.9）v85版本最新更新内容：",
       "content": "内容盒子26.10.31（1.9）v85\n界面介绍：主界面提供【内容】【黑科技】主状态栏\n内容栏：主要提供公告发布及使用技巧等有效内容提供，后续将会逐步扩充\n黑科技栏：主要提供小工具及作者或内置更新补充一些实用工具和网点共快捷使用\n目前内置有多个小工具 > 小工具栏在底部\n\n最新更新：\nv66\n修复本地bug\n优化网页端、手机端、本地端适配\n优化浅色主题/暗调主题，不同主题界面显示\n\nv62\n优化程序 \n\nv56\n修复多个bug\n优化界面流畅及UI美化\n修改了黑科技栏布局排版\n新增多个内置小工具，已添加至黑科技栏最底下 > 小工具栏\n\n\n\n\nV42\n效率工具箱新增：小说搜索引擎\n影视-音乐栏新增：魔力音乐\n\nV41\n新增多个快捷工具箱：\n效率工具类：一个木函-多功能效率工具箱、兽音译者\n影视类：落雪TV、TvTFun\n具体工具用法介绍查看工具栏公告\n\n界面功能新增：浅色主题/暗调主题切换 [ 关于栏下面可自主切换：记忆本机：切换后下次进入将保留上次主题模式 ]\n\n优化：\n提升整体界面的观感，增加了状态栏及内容卡片的气泡透明度状态\n\n优化整体流畅度、加载速度\n手机端优化了开屏白屏延迟问题，加载流畅度提升\n手机端优化了在打开一篇内容或者工具箱时，用手机返回键操作后直接退出APP的bug\n手机端打开内置快捷工具箱网点可直接APP内直开，不会跳转浏览器，减少不必要的跳转和延迟，提升便捷使用\n\n\n作者：酷白.Abai\n公众号：星海里找尘埃\n有问题或者好用的工具站点有想法扩充可到公众号反馈，谢谢",
-      "cover": "assets/img-4c43949c2e22.jpg?sharecode=AK6QIELR67",
+      "cover": "assets/img-4c43949c2e22.jpg?sharecode=LXZ6WX2ERL",
       "pinned": true,
       "order": 9,
       "published": true,
@@ -313,7 +313,7 @@
       "category": "article",
       "summary": "",
       "content": "装修中...1",
-      "cover": "assets/img-451bd79cfb50.jpg?sharecode=AK6QIELR67",
+      "cover": "assets/img-451bd79cfb50.jpg?sharecode=LXZ6WX2ERL",
       "coverShape": "square",
       "pinned": false,
       "order": 0,
@@ -332,7 +332,7 @@
       "category": "article",
       "summary": "",
       "content": "装修中...2",
-      "cover": "assets/img-e66e5b929a26.jpg?sharecode=AK6QIELR67",
+      "cover": "assets/img-e66e5b929a26.jpg?sharecode=LXZ6WX2ERL",
       "coverShape": "square",
       "pinned": false,
       "order": 0,
@@ -351,7 +351,7 @@
       "category": "article",
       "summary": "",
       "content": "装修中...3",
-      "cover": "assets/img-30e98295c1f3.jpg?sharecode=AK6QIELR67",
+      "cover": "assets/img-30e98295c1f3.jpg?sharecode=LXZ6WX2ERL",
       "coverShape": "square",
       "pinned": false,
       "order": 0,

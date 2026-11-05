@@ -31,7 +31,7 @@
   let _toolsLoading = null;
   function ensureTools() {
     if (window.CBTools) return Promise.resolve();
-    if (!_toolsLoading) _toolsLoading = ensureScript('js/tools.js?sharecode=AK6QIELR67');
+    if (!_toolsLoading) _toolsLoading = ensureScript('js/tools.js?sharecode=LXZ6WX2ERL');
     return _toolsLoading;
   }
   // qrcode.js 同样从首屏剥离（约 56KB），仅当关于页/二维码工具真正需要时才加载；
@@ -39,7 +39,7 @@
   let _qrcodeLoading = null;
   function ensureQrcode() {
     if (window.qrcode) return Promise.resolve();
-    if (!_qrcodeLoading) _qrcodeLoading = ensureScript('js/qrcode.js?sharecode=AK6QIELR67');
+    if (!_qrcodeLoading) _qrcodeLoading = ensureScript('js/qrcode.js?sharecode=LXZ6WX2ERL');
     return _qrcodeLoading;
   }
   function fmtDate(s) {
@@ -133,7 +133,7 @@
   function resolveAppVersion() {
     return getSwVersion().then(function (v) {
       if (v) return v;
-      return fetch('./sw.js?sharecode=AK6QIELR67&pv=1').then(function (r) { return r.text(); }).then(function (t) {
+      return fetch('./sw.js?sharecode=LXZ6WX2ERL&pv=1').then(function (r) { return r.text(); }).then(function (t) {
         const m = t.match(/const\s+CACHE\s*=\s*['"]([^'"]+)['"]/);
         return m ? m[1] : null;
       }).catch(function () { return null; });
@@ -234,7 +234,7 @@
       });
       // 注册 URL 带 &v= 版本号：每次部署脚本地址都不同，浏览器必须重新下载 SW，
       // 不再依赖对 sw.js 的 HTTP 缓存复用，从而「一次刷新就生效」，杜绝反复刷新才更新的卡顿。
-      navigator.serviceWorker.register('sw.js?sharecode=AK6QIELR67&v=87').then(function (reg) {
+      navigator.serviceWorker.register('sw.js?sharecode=LXZ6WX2ERL&v=88').then(function (reg) {
         if (!reg) return;
         // 主动触发一次更新检查（register 本身也会检查，这里再兜一层，缩短检测时延）
         if (reg.update) { try { reg.update(); } catch (e) {} }
@@ -844,7 +844,7 @@
       // 二维码编码「下载引导页」：普通网页链接，不会被微信/QQ 等扫码工具拦截（之前直接用 .apk 直链会提示「停止访问」）
       // qrcode.js 已从首屏剥离，这里按需异步加载后再渲染（仅访问关于页时才拉取，不拖累首屏）
       // 二维码必须编码正式站点地址：后台 / 预览容器里 location.origin 可能是 127.0.0.1，扫出来是无效链接
-      const aboutQrUrl = 'https://content-box-24323.app.workbuddy.host/?sharecode=AK6QIELR67&to=install';
+      const aboutQrUrl = 'https://2118301017820069888.app.workbuddy.host/?sharecode=LXZ6WX2ERL&to=install';
       ensureQrcode().then(function () {
         try {
           const qr = qrcode(0, 'M');
@@ -968,7 +968,7 @@
     // 按需加载工具引擎（首屏已剥离，打开时才拉），二维码工具额外需要 qrcode.js
     await ensureTools();
     if (toolCfg.engine === 'qrcode') {
-      try { await ensureScript('js/qrcode.js?sharecode=AK6QIELR67'); } catch (e) {}
+      try { await ensureScript('js/qrcode.js?sharecode=LXZ6WX2ERL'); } catch (e) {}
     }
     body.innerHTML = '';
     // 强制 enabled，避免被 CBTools.render 的过滤器吞掉导致空白

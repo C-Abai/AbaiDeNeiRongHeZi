@@ -1,5 +1,5 @@
-const CACHE = 'contentbox-v87';
-const SC = 'AK6QIELR67';
+const CACHE = 'contentbox-v88';
+const SC = 'LXZ6WX2ERL';
 const ASSETS = [
   './index.html?sharecode=' + SC,
   './admin.html?sharecode=' + SC,
