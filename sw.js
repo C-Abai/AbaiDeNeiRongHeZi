@@ -1,4 +1,4 @@
-const CACHE = 'contentbox-v82';
+const CACHE = 'contentbox-v83';
 const SC = 'AK6QIELR67';
 const ASSETS = [
   './index.html?sharecode=' + SC,

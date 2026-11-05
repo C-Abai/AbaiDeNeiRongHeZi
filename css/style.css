@@ -1126,11 +1126,31 @@ body.admin-dark .guide-url-box .gub-full { color: #c7cdd6; }
 .upd-full .upd-text { font-size: 15px; }
 .upd-full .upd-close { top: 14px; right: 16px; }
 
-/* 明暗：auto 跟随 body.dim；light / dark 强制覆盖 */
+/* ===== 明暗适配 =====
+   auto：跟随站点（暗调用 body.dim / 后台暗调用 body.admin-dark；浅色则用下方实体白底规则）
+   light / dark：强制覆盖 */
+/* 浅色主题（auto 非暗调 + 强制 light）：卡片用纯白实体背景、正文用深灰，
+   彻底杜绝「半透明卡片 + 浅灰正文」导致正文糊成一片、气泡卡背后内容透出干扰文字 */
+.upd-mask.upd-light .upd-card,
+.upd-inline-preview.upd-light .upd-card,
+.upd-mask.upd-auto .upd-card,
+.upd-inline-preview.upd-auto .upd-card { background: #ffffff; color: #1f2329; border-color: #ebedf0; }
+.upd-mask.upd-light .upd-text,
+.upd-inline-preview.upd-light .upd-text,
+.upd-mask.upd-auto .upd-text,
+.upd-inline-preview.upd-auto .upd-text { color: #4a525d; }
+/* 气泡卡片：浅色下同样实体白底 + 加深阴影，避免背后内容透出干扰文字 */
+.upd-mask.upd-light.upd-bubble .upd-card,
+.upd-mask.upd-auto.upd-bubble .upd-card { background: #ffffff; box-shadow: 0 16px 44px rgba(0,0,0,.28); }
+/* 浅色主题关闭按钮：浅灰圆底 + 深灰字，保证在白卡上清晰可见 */
+.upd-mask.upd-light .upd-close,
+.upd-mask.upd-auto .upd-close,
+.upd-inline-preview.upd-light .upd-close,
+.upd-inline-preview.upd-auto .upd-close { background: rgba(17,24,32,.06); color: #5a6470; }
+
+/* 深色主题（auto 暗调 + 强制 dark）：保持原对比，无问题 */
 body.dim .upd-mask.upd-auto .upd-card { background: rgba(24,27,36,.94); color: #eaedf1; border-color: rgba(255,255,255,.14); }
 body.dim .upd-mask.upd-auto .upd-text { color: #a9b0bb; }
-.upd-mask.upd-light .upd-card, .upd-inline-preview.upd-light .upd-card { background: #fff; color: #1f2329; border-color: #ebedf0; }
-.upd-mask.upd-light .upd-text, .upd-inline-preview.upd-light .upd-text { color: #8a8f99; }
 .upd-mask.upd-dark .upd-card, .upd-inline-preview.upd-dark .upd-card { background: #1e222a; color: #eaedf1; border-color: rgba(255,255,255,.14); }
 .upd-mask.upd-dark .upd-text, .upd-inline-preview.upd-dark .upd-text { color: #a9b0bb; }
 /* 深色卡片上的关闭按钮：浅字 + 半透明白底 */
