@@ -36,6 +36,7 @@
   <button id="backBtn">‹ 返回</button>
   <div class="t" id="title">影视</div>
   <button id="refreshBtn">刷新</button>
+  <button id="openExt">↗ 浏览器打开</button>
   <button id="fsBtn">横屏全屏</button>
 </div>
 <iframe id="frame" allow="autoplay; encrypted-media; fullscreen; picture-in-picture; accelerometer; gyroscope"
@@ -52,6 +53,9 @@
     if (url) frame.src = url;
     document.getElementById('backBtn').onclick = function () {
       if (history.length > 1) history.back(); else location.href = './';
+    };
+    document.getElementById('openExt').onclick = function () {
+      if (url) window.open(url, '_blank');
     };
     document.getElementById('refreshBtn').onclick = function () {
       try { frame.contentWindow.location.reload(); } catch (e) { frame.src = frame.src; }
