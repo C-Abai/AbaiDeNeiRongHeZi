@@ -56,6 +56,27 @@
     } catch (e) { /* 指纹更新失败不阻断内容发布 */ }
   }
 
+  // 计算本次发布相对「线上旧内容」的新增/修改帖子，生成 deployMeta，使公开端精准标红
+  function buildDeployMeta(prev, next) {
+    const prevPosts = (prev && prev.posts) || [];
+    const nextPosts = (next && next.posts) || [];
+    const prevMap = {};
+    prevPosts.forEach(function (p) { if (p && p.id) prevMap[p.id] = p; });
+    const changedIds = [], unchangedIds = [];
+    nextPosts.forEach(function (p) {
+      if (!p || !p.id) return;
+      const old = prevMap[p.id];
+      let isChanged = true;
+      if (old) {
+        const a = Object.assign({}, old); delete a.deployMeta; delete a.__v;
+        const b = Object.assign({}, p);  delete b.deployMeta; delete b.__v;
+        isChanged = (JSON.stringify(a) !== JSON.stringify(b));
+      }
+      (isChanged ? changedIds : unchangedIds).push(p.id);
+    });
+    return { ts: String(Date.now()), changedIds: changedIds, unchangedIds: unchangedIds };
+  }
+
   async function publishToGitHub(data, silent) {
     const tok = ghToken();
     if (!tok) { if (!silent) toast('未配置 GitHub 发布令牌'); return false; }
@@ -67,6 +88,13 @@
       }, 6000);
       if (!head.ok) { if (!silent) toast('获取文件信息失败：' + head.status); return false; }
       const meta = await head.json();
+      // 解码线上旧内容，计算本次新增/修改的帖子，生成 deployMeta（公开端据此精准标红）
+      let prevContent = null;
+      try {
+        const b64c = (meta.content || '').replace(/\s/g, '');
+        prevContent = JSON.parse(decodeURIComponent(escape(atob(b64c))));
+      } catch (e) { prevContent = null; }
+      data.deployMeta = buildDeployMeta(prevContent, data);
       const body = JSON.stringify(data, null, 2);
       const b64 = btoa(unescape(encodeURIComponent(body)));
       const put = await fetchWithTimeout(GH_API, {
