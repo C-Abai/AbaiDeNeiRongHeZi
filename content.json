@@ -26,44 +26,44 @@
     "toolsEnabled": [],
     "tools": [
       {
-        "id": "t_filelink",
-        "name": "🔗 文件转直链下载",
-        "engine": "filelink",
-        "enabled": true,
-        "order": 1
-      },
-      {
         "id": "t_qrcode",
         "name": "🔳 二维码生成",
         "engine": "qrcode",
         "enabled": true,
-        "order": 2
+        "order": 1
       },
       {
         "id": "t_pmvw1vysrtry95",
         "name": "🍅 番茄钟",
         "engine": "pomodoro",
         "enabled": true,
-        "order": 3
+        "order": 2
       },
       {
         "id": "t_pmvw1w63f3ttw0",
         "name": "🖼 图片压缩",
         "engine": "imgcompress",
         "enabled": true,
-        "order": 4
+        "order": 3
       },
       {
         "id": "t_base64",
         "name": "🔐 Base64 编解码",
         "engine": "base64",
         "enabled": true,
-        "order": 5
+        "order": 4
       },
       {
         "id": "t_counter",
         "name": "🔢 字数统计",
         "engine": "counter",
+        "enabled": true,
+        "order": 5
+      },
+      {
+        "id": "t_stego",
+        "name": "🖼 图片隐写术（藏密）",
+        "engine": "stego",
         "enabled": true,
         "order": 6
       }

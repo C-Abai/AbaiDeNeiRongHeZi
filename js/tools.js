@@ -128,37 +128,106 @@
     };
   });
 
-  // 引擎 7：文件转直链下载（本机 data URL 形式）
-  defineEngine('filelink', function (root) {
-    root.innerHTML = '<p class="card-desc" style="margin:0 0 10px">选择文件，生成一个可直接点击下载的链接（data URL 形式，本机可用）。</p>'
-      + '<div class="row"><input type="file" id="fl_file" style="flex:1; width:auto"/><button class="btn" id="fl_gen">生成直链</button></div>'
-      + '<textarea id="fl_url" readonly placeholder="生成的直链会显示在这里" style="margin-top:12px"></textarea>'
-      + '<div class="row"><button class="btn ghost" id="fl_copy">复制链接</button><button class="btn ghost" id="fl_open">打开/下载</button></div>'
-      + '<p class="help" style="color:var(--muted);font-size:12px;margin-top:8px">说明：该直链是文件内容的 data URL，体积约等于文件本身，仅本机/当前浏览器可用，换设备无法下载；超大文件可能超出长度限制。要真正可分享的短直链需接入云端。</p>';
-    q('#fl_gen').onclick = function () {
-      const f = q('#fl_file').files[0];
-      if (!f) { toast('请先选择文件'); return; }
-      const reader = new FileReader();
-      reader.onload = function () {
-        q('#fl_url').value = reader.result;
-        toast('已生成直链（长度 ' + reader.result.length + '）');
-      };
-      reader.onerror = function () { toast('读取失败'); };
-      reader.readAsDataURL(f);
+  // 引擎 7：图片隐写术（LSB 隐写，纯本地、零依赖、不需要任何服务器）
+  defineEngine('stego', function (root) {
+    root.innerHTML = '<p class="card-desc" style="margin:0 0 10px">把一段文字藏进图片像素的最低位（LSB 隐写）。图片肉眼几乎不变，只有用本工具才能提取——适合把密码/密信藏进一张普通照片里传递。<b>注意：这是隐藏而非强加密，敏感内容请加密码。</b></p>'
+      + '<div style="border:1px solid var(--line);border-radius:10px;padding:10px;margin-bottom:10px">'
+      + '  <div class="field"><label>① 要隐藏的文字</label><textarea id="st_text" placeholder="输入要藏起来的内容（支持中文）"></textarea></div>'
+      + '  <div class="field"><label>可选密码（对文字异或混淆，提取时需一致）</label><input id="st_key" placeholder="留空则不加密"/></div>'
+      + '  <div class="field"><label>载体图片（建议 PNG/JPG，不要压缩过度的图）</label><input type="file" id="st_img" accept="image/*" style="width:auto"/></div>'
+      + '  <button class="btn" id="st_encode" style="margin-top:6px">编码并下载藏密图（PNG）</button>'
+      + '</div>'
+      + '<div style="border:1px solid var(--line);border-radius:10px;padding:10px">'
+      + '  <div class="field"><label>② 藏密图片（提取文字）</label><input type="file" id="st_img2" accept="image/*" style="width:auto"/></div>'
+      + '  <div class="field"><label>可选密码（若编码时设了密码，需填一致的密码）</label><input id="st_key2" placeholder="留空则无需密码"/></div>'
+      + '  <button class="btn" id="st_decode" style="margin-top:6px">提取文字</button>'
+      + '  <textarea id="st_out" readonly placeholder="提取出的文字会显示在这里" style="margin-top:8px"></textarea>'
+      + '</div>'
+      + '<p class="help" style="color:var(--muted);font-size:12px;margin-top:8px">原理：把文字每字节拆成 8 个比特，写入连续像素 RGB 通道的最低位（人眼无法察觉）。全程在你的浏览器里完成，图片不会上传到任何服务器。</p>';
+
+    function textToBits(str, key) {
+      var bytes = new TextEncoder().encode(str);
+      var len = bytes.length;
+      var all = new Uint8Array(4 + len);
+      all[0] = (len >>> 24) & 255; all[1] = (len >>> 16) & 255; all[2] = (len >>> 8) & 255; all[3] = len & 255;
+      for (var i = 0; i < len; i++) all[4 + i] = bytes[i];
+      if (key) { var kb = new TextEncoder().encode(key); for (var j = 0; j < all.length; j++) all[j] ^= kb[j % kb.length]; }
+      var bits = [];
+      for (var k = 0; k < all.length; k++) for (var b = 7; b >= 0; b--) bits.push((all[k] >> b) & 1);
+      return bits;
+    }
+    function bitsToText(bits, key) {
+      var n = Math.floor(bits.length / 8);
+      var all = new Uint8Array(n);
+      for (var i = 0; i < n; i++) { var v = 0; for (var b = 0; b < 8; b++) v = (v << 1) | bits[i * 8 + b]; all[i] = v; }
+      if (key) { var kb = new TextEncoder().encode(key); for (var j = 0; j < all.length; j++) all[j] ^= kb[j % kb.length]; }
+      var len = ((all[0] << 24) | (all[1] << 16) | (all[2] << 8) | all[3]) >>> 0;
+      if (len <= 0 || len > all.length - 4 || len > 10485760) return '（提取失败：密码错误或不是藏密图）';
+      var body = all.slice(4, 4 + len);
+      try { return new TextDecoder('utf-8', { fatal: true }).decode(body); } catch (e) { return '（提取失败：密码错误或不是藏密图）'; }
+    }
+    function loadImage(file) {
+      return new Promise(function (resolve, reject) {
+        var reader = new FileReader();
+        reader.onload = function () {
+          var img = new Image();
+          img.onload = function () { resolve(img); };
+          img.onerror = function () { reject('图片读取失败'); };
+          img.src = reader.result;
+        };
+        reader.onerror = function () { reject('文件读取失败'); };
+        reader.readAsDataURL(file);
+      });
+    }
+    q('#st_encode').onclick = function () {
+      var text = q('#st_text').value;
+      if (!text) { toast('请先输入要隐藏的文字'); return; }
+      var file = q('#st_img').files[0];
+      if (!file) { toast('请选择载体图片'); return; }
+      var key = q('#st_key').value;
+      loadImage(file).then(function (img) {
+        var c = document.createElement('canvas');
+        c.width = img.width; c.height = img.height;
+        var ctx = c.getContext('2d');
+        ctx.drawImage(img, 0, 0);
+        var data = ctx.getImageData(0, 0, c.width, c.height);
+        var px = data.data;
+        var bits = textToBits(text, key);
+        var capacity = Math.floor(px.length / 4) * 3;
+        if (bits.length > capacity) { toast('文字太长，装不下，换小图或减少文字'); return; }
+        var bi = 0;
+        for (var i = 0; i < px.length && bi < bits.length; i += 4) {
+          for (var ch = 0; ch < 3 && bi < bits.length; ch++) px[i + ch] = (px[i + ch] & 0xFE) | bits[bi++];
+        }
+        ctx.putImageData(data, 0, 0);
+        c.toBlob(function (blob) {
+          var a = document.createElement('a');
+          a.href = URL.createObjectURL(blob);
+          a.download = 'stego.png';
+          document.body.appendChild(a); a.click(); a.remove();
+          setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
+          toast('已生成藏密图（stego.png）');
+        }, 'image/png');
+      }).catch(function (e) { toast(e); });
     };
-    q('#fl_copy').onclick = function () {
-      const v = q('#fl_url').value;
-      if (!v) { toast('请先生成'); return; }
-      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(v);
-      toast('已复制');
-    };
-    q('#fl_open').onclick = function () {
-      const v = q('#fl_url').value;
-      if (!v) { toast('请先生成'); return; }
-      const f = q('#fl_file').files[0];
-      const a = document.createElement('a');
-      a.href = v; a.download = (f && f.name) || 'download';
-      document.body.appendChild(a); a.click(); a.remove();
+    q('#st_decode').onclick = function () {
+      var file = q('#st_img2').files[0];
+      if (!file) { toast('请选择藏密图片'); return; }
+      var key = q('#st_key2').value;
+      q('#st_out').value = '';
+      loadImage(file).then(function (img) {
+        var c = document.createElement('canvas');
+        c.width = img.width; c.height = img.height;
+        var ctx = c.getContext('2d');
+        ctx.drawImage(img, 0, 0);
+        var px = ctx.getImageData(0, 0, c.width, c.height).data;
+        var bits = [];
+        for (var i = 0; i < px.length; i += 4) for (var ch = 0; ch < 3; ch++) bits.push(px[i + ch] & 1);
+        var text = bitsToText(bits, key);
+        q('#st_out').value = text;
+        if (text.indexOf('（提取失败') === 0) toast(text);
+        else toast('提取完成');
+      }).catch(function (e) { q('#st_out').value = '（提取失败：' + e + '）'; toast('提取失败：' + e); });
     };
   });
 
@@ -285,7 +354,7 @@
         { id: 'text', name: '文本处理' },
         { id: 'color', name: '颜色转换 HEX⇄RGB' },
         { id: 'qrcode', name: '二维码生成' },
-        { id: 'filelink', name: '文件转直链下载' },
+        { id: 'stego', name: '图片隐写术（藏密）' },
         { id: 'imgcompress', name: '🖼 图片压缩' },
         { id: 'pomodoro', name: '🍅 番茄钟' },
         { id: 'link', name: '🔗 链接启动器（自定义网址）' },

@@ -90,7 +90,7 @@
           { id: 't_text', name: '📝 文本处理', engine: 'text', enabled: true, order: 4 },
           { id: 't_color', name: '🎨 颜色转换 HEX⇄RGB', engine: 'color', enabled: true, order: 5 },
           { id: 't_qrcode', name: '🔳 二维码生成', engine: 'qrcode', enabled: true, order: 6 },
-          { id: 't_filelink', name: '🔗 文件转直链下载', engine: 'filelink', enabled: true, order: 7 }
+          { id: 't_stego', name: '🖼 图片隐写术（藏密）', engine: 'stego', enabled: true, order: 7 }
         ],
         links: [],
         author: { name: '作者', intro: '这里是关于作者的介绍。可以在后台「站点设置」里编辑这一段内容。' },
