@@ -164,36 +164,6 @@
     CBStore.applyTheme(th);
   }
 
-  // ===== 51.la 在线人数挂件：由后台 config.analytics.widget 控制，按需加载/移除 =====
-  // 基础统计已静态写在各 HTML head 里（过检测必需）；这里只控制可选的右下角挂件。
-  // _widgetLoaded 去重：后台预览反复推草稿时避免重复叠加脚本。
-  const LA_WIDGET_ID = '3RpzfUTqlbeltGdX';
-  let _widgetLoaded = false;
-  function syncAnalyticsWidget() {
-    try {
-      const want = !!(content.config && content.config.analytics && content.config.analytics.widget);
-      const tagId = 'la-widget-script';
-      const existing = document.getElementById(tagId);
-      if (want) {
-        if (_widgetLoaded && existing) return;
-        if (existing) return;
-        const s = document.createElement('script');
-        s.id = tagId;
-        s.charset = 'UTF-8';
-        s.src = 'https://v6-widget.51.la/v6/' + LA_WIDGET_ID + '/quote.js';
-        (document.head || document.body).appendChild(s);
-        _widgetLoaded = true;
-      } else {
-        if (existing && existing.parentNode) existing.parentNode.removeChild(existing);
-        // 挂件自身注入的样式/DOM 一并清理，避免关掉后角标残留
-        document.querySelectorAll('.la-widget, [id*="la-widget"], [class*="v6-widget"]').forEach(function (el) {
-          if (el.id !== tagId && el.parentNode) el.parentNode.removeChild(el);
-        });
-        _widgetLoaded = false;
-      }
-    } catch (e) {}
-  }
-
   let painted = false;
   // 首屏绘制（缓存命中时同步执行，壁纸与内容立即出现，消除白屏）
   function paint() {
@@ -202,7 +172,6 @@
     $('#siteTitle').textContent = (content.config && content.config.siteTitle) || '内容盒子';
     $('#siteDesc').textContent = (content.config && content.config.siteDesc) || '';
     applyEffectiveTheme();
-    syncAnalyticsWidget();
     if (content.config && content.config.icon) CBStore.applyIcon(content.config.icon);
     if (!painted) { bindTabs(); painted = true; }
     syncTabs();
@@ -265,7 +234,7 @@
       });
       // 注册 URL 带 &v= 版本号：每次部署脚本地址都不同，浏览器必须重新下载 SW，
       // 不再依赖对 sw.js 的 HTTP 缓存复用，从而「一次刷新就生效」，杜绝反复刷新才更新的卡顿。
-      navigator.serviceWorker.register('sw.js?sharecode=LXZ6WX2ERL&v=93').then(function (reg) {
+      navigator.serviceWorker.register('sw.js?sharecode=LXZ6WX2ERL&v=94').then(function (reg) {
         if (!reg) return;
         // 主动触发一次更新检查（register 本身也会检查，这里再兜一层，缩短检测时延）
         if (reg.update) { try { reg.update(); } catch (e) {} }

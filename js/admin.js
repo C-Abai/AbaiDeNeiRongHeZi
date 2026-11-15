@@ -609,7 +609,6 @@
       + '<div class="field"><label>作者名称</label><input type="text" id="s_author" value="' + esc((c.author && c.author.name) || '') + '"/></div>'
       + '<div class="field"><label>作者介绍（支持换行）</label><textarea id="s_author_intro" class="auth-textarea">' + esc((c.author && c.author.intro) || '') + '</textarea></div>'
       + '<div class="checkbox-row"><input type="checkbox" id="s_tools" ' + (c.showTools !== false ? 'checked' : '') + '/><label for="s_tools">显示「黑科技 · 小工具」板块</label></div>'
-      + '<div class="checkbox-row"><input type="checkbox" id="s_widget" ' + (c.analytics && c.analytics.widget ? 'checked' : '') + '/><label for="s_widget">显示 51.la 在线人数挂件（免费统计站点访问；关掉则完全不显示，统计本身仍在进行）</label></div>'
       + '<div class="sub">📦 安卓安装包（.apk）</div>'
       + '<div class="field"><label>APK 直装链接（留空则不显示下载按钮）</label><input type="text" id="s_apk" value="' + esc(c.apkUrl || '') + '" placeholder="https://.../app.apk"/></div>'
       + '<div class="sub">🟢 应用图标</div>'
@@ -831,8 +830,6 @@
       content.config.siteDesc = $('#s_desc').value.trim();
       content.config.author = { name: $('#s_author').value.trim(), intro: $('#s_author_intro').value };
       content.config.showTools = $('#s_tools').checked;
-      content.config.analytics = content.config.analytics || {};
-      content.config.analytics.widget = $('#s_widget').checked;
       content.config.apkUrl = ($('#s_apk').value || '').trim();
       content.config.icon = iconData;
       content.config.aboutApp = $('#s_about_app').value;
