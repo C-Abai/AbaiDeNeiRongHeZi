@@ -82,6 +82,7 @@
         siteTitle: '内容盒子',
         siteDesc: '我的自定义文章与黑科技小工具',
         showTools: true,
+        analytics: { widget: false },
         theme: { primary: '#07c160', bg: '#f5f6f8', card: '#ffffff', text: '#1f2329', wallpaper: '', wallpaperBlur: 0, wallpaperOpacity: 100, wallpaperFull: false, dimMode: false, dimLevel: 5, dimCardOpacity: 40, dimBlur: 1, tabDimOpacity: 60, tabDimBlur: 8 },
         tools: [
           { id: 't_base64', name: '🔐 Base64 编解码', engine: 'base64', enabled: true, order: 1 },

@@ -4,6 +4,9 @@
     "siteTitle": "内容盒子",
     "siteDesc": "Abai的内容盒子 | 这里下滑刷新 - 有内容更新时刷新同步",
     "showTools": true,
+    "analytics": {
+      "widget": false
+    },
     "theme": {
       "primary": "#07c160",
       "bg": "#f5f6f8",

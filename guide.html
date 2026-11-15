@@ -5,6 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="theme-color" content="#07c160" />
   <title>下载安装</title>
+  <!-- 51.la 统计 SDK（静态写死，过检测） -->
+  <script charset="UTF-8" id="LA_COLLECT" src="//sdk.51.la/js-sdk-pro.min.js"></script>
+  <script>LA.init({id:"3RpzfUTqlbeltGdX",ck:"3RpzfUTqlbeltGdX",autoTrack:true,showWidget:false})</script>
   <style>
     :root {
       --g-primary: #07c160;
@@ -141,7 +144,10 @@
         card.innerHTML = html;
 
         var gBtn = document.getElementById('gBtn');
-        if (gBtn) gBtn.onclick = function () { location.href = apk; };
+        if (gBtn) gBtn.onclick = function () {
+          try { if (window.LA && LA.track) LA.track('download'); } catch (e) {}
+          location.href = apk;
+        };
         var gCopy = document.getElementById('gCopy');
         if (gCopy) gCopy.onclick = function () {
           if (navigator.clipboard && navigator.clipboard.writeText) {
