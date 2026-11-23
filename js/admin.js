@@ -25,6 +25,11 @@
   const GH_BRANCH = 'main';
   const GH_PATH = 'content.json';
   const GH_RAW = 'https://raw.githubusercontent.com/' + GH_OWNER + '/' + GH_REPO + '/refs/heads/' + GH_BRANCH + '/' + GH_PATH;
+  // 国内直连 raw.githubusercontent.com 常不可达，准备多条镜像兜底（数据源同为 GitHub 仓库，仅通道不同）
+  const GH_RAW_FALLBACKS = [
+    GH_RAW,
+    'https://fastly.jsdelivr.net/gh/' + GH_OWNER + '/' + GH_REPO + '@' + GH_BRANCH + '/' + GH_PATH
+  ];
   const GH_API = 'https://api.github.com/repos/' + GH_OWNER + '/' + GH_REPO + '/contents/' + GH_PATH;
   const GH_META_API = 'https://api.github.com/repos/' + GH_OWNER + '/' + GH_REPO + '/contents/meta.json';
   function ghToken() { try { return localStorage.getItem('cb_admin_gh_token') || ''; } catch (e) { return ''; } }
@@ -134,6 +139,22 @@
     return m ? m[1] : '?';
   }
 
+  // 剔除草稿里「引擎已被删除」的死工具（如旧版 filelink 文件转直链）。
+  // 以 CBTools.engines() 现有引擎清单为准；返回被剔除的条数，便于记录。
+  function pruneDeadTools(d) {
+    const tools = d && d.config && d.config.tools;
+    if (!Array.isArray(tools)) return 0;
+    const valid = (window.CBTools ? CBTools.engines() : []).map(function (e) { return e.id; });
+    if (!valid.length) return 0; // 引擎清单未就绪时绝不删，避免误伤
+    const kept = tools.filter(function (t) { return t && valid.indexOf(t.engine) > -1; });
+    const removed = tools.length - kept.length;
+    if (removed > 0) {
+      d.config.tools = kept;
+      kept.forEach(function (t, i) { t.order = i + 1; });
+    }
+    return removed;
+  }
+
   // 当线上内容已更新（deployMeta.ts 更新）而本机草稿落后时，以线上内容为权威打底，
   // 仅补回「本机独有、线上没有」的新增项（帖子/链接/合集/工具），避免旧草稿覆盖新发布内容
   function rebaseDraft(pub, dft) {
@@ -148,6 +169,7 @@
     out.config.links = keepLocalOnly(pub.config.links, dft.config.links, 'links');
     out.config.linkGroups = keepLocalOnly(pub.config.linkGroups, dft.config.linkGroups, 'linkGroups');
     out.config.tools = keepLocalOnly(pub.config.tools, dft.config.tools, 'tools');
+    pruneDeadTools(out); // 剔除本机草稿补回的已删除工具（如 filelink），避免死工具复活
     // 主题：保留本机本地微调（若本机有），否则用线上；其余 config 字段本机独有也补回
     out.config.theme = (dft.config && dft.config.theme) || (pub.config && pub.config.theme);
     Object.keys(dft.config || {}).forEach(function (k) {
@@ -1166,6 +1188,7 @@
 
   function renderTools(panel) {
     const c = (content.config = content.config || {});
+    pruneDeadTools(content); // 打开工具面板时先清一遍已删除引擎的死工具，防止旧草稿残留显示
     let tools = c.tools;
     if (!Array.isArray(tools) || !tools.length) { tools = c.tools = defaultToolsConfig(); }
 
@@ -1553,17 +1576,26 @@
     const ghStatus = document.getElementById('gh_status');
     $('#gh_reload').onclick = async function () {
       if (ghStatus) ghStatus.textContent = '正在从 GitHub 拉取最新内容…';
-      try {
-        // 手动重载也带超时：GitHub raw 跨境不可达时 5 秒内给明确反馈，不无限转圈
-        const r = await fetchWithTimeout(GH_RAW + '?t=' + Date.now(), { cache: 'no-store' }, 5000);
-        if (!r.ok) throw new Error('HTTP ' + r.status);
-        const fresh = await r.json();
-        content = fresh;
-        saveLocalOnly(content);
-        applyAdminTheme();
-        renderPanel('publish');
-        toast('✅ 已同步线上最新内容（v' + versionOf(fresh) + '）');
-      } catch (e) { if (ghStatus) ghStatus.textContent = '❌ 拉取失败：' + (e && e.message || e); toast('拉取失败'); }
+      // 逐通道尝试：raw 主站不通就自动切 CDN 镜像，数据源同为 GitHub 仓库，跨设备对齐用途不变
+      let lastErr = null, fresh = null;
+      for (let i = 0; i < GH_RAW_FALLBACKS.length; i++) {
+        try {
+          const r = await fetchWithTimeout(GH_RAW_FALLBACKS[i] + '?t=' + Date.now(), { cache: 'no-store' }, 8000);
+          if (!r.ok) throw new Error('HTTP ' + r.status);
+          const d = await r.json();
+          if (!d || !d.config) throw new Error('内容格式异常');
+          fresh = d;
+          break;
+        } catch (e) { lastErr = e; if (ghStatus) ghStatus.textContent = '正在重试备用通道…（' + (i + 1) + '/' + GH_RAW_FALLBACKS.length + '）'; }
+      }
+      if (!fresh) { if (ghStatus) ghStatus.textContent = '❌ 拉取失败：' + (lastErr && lastErr.message || lastErr); toast('拉取失败'); return; }
+      content = fresh;
+      // 拉取到的是 GitHub 权威内容：清掉本机草稿里已删除工具的残留后落盘，避免旧工具复活
+      pruneDeadTools(content);
+      saveLocalOnly(content);
+      applyAdminTheme();
+      renderPanel('publish');
+      toast('✅ 已同步线上最新内容（v' + versionOf(fresh) + '）');
     };
     $('#gh_save_cfg').onclick = function () { setGhToken($('#gh_token').value.trim()); setGhAuto($('#gh_auto').checked); if (ghStatus) ghStatus.textContent = '已保存令牌配置（仅存本机）。' + (ghAuto() ? '已开启「保存即发布」。' : ''); toast('已保存令牌配置'); };
     $('#gh_publish_now').onclick = async function () { if (ghStatus) ghStatus.textContent = '发布中…'; const ok = await publishToGitHub(content, false); if (ghStatus) ghStatus.textContent = ok ? '✅ 已发布，所有设备重开即同步。' : '❌ 发布失败，请检查令牌或网络。'; };
