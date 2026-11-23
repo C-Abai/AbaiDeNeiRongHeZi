@@ -234,7 +234,7 @@
       });
       // 注册 URL 带 &v= 版本号：每次部署脚本地址都不同，浏览器必须重新下载 SW，
       // 不再依赖对 sw.js 的 HTTP 缓存复用，从而「一次刷新就生效」，杜绝反复刷新才更新的卡顿。
-      navigator.serviceWorker.register('sw.js?sharecode=LXZ6WX2ERL&v=94').then(function (reg) {
+      navigator.serviceWorker.register('sw.js?sharecode=LXZ6WX2ERL&v=95').then(function (reg) {
         if (!reg) return;
         // 主动触发一次更新检查（register 本身也会检查，这里再兜一层，缩短检测时延）
         if (reg.update) { try { reg.update(); } catch (e) {} }
@@ -511,6 +511,124 @@
   function setLocalPosts(a) { try { localStorage.setItem(LP_KEY, JSON.stringify(a)); } catch (e) {} }
   function dropLocalPost(id) { setLocalPosts(localPosts().filter(function (x) { return x.id !== id; })); }
 
+  // ===== 顶部横幅轮播：自动循环播放的横版卡片，点击跳转链接（黑科技栏顶部）=====
+  let _bannerTimer = null;        // 自动播放定时器（重绘前统一清理，避免多次 render 叠加多个定时器）
+  let _bannerIdx = 0;             // 当前显示的卡片下标
+
+  function bannerHtml() {
+    const b = (content.config && content.config.banner) || {};
+    if (b.enabled === false) return '';
+    const items = (b.items || []).filter(function (it) { return it && it.image; });
+    if (!items.length) return '';
+    const slides = items.map(function (it, i) {
+      const url = /^https?:\/\//i.test(it.url || '') ? it.url : '';
+      const tag = url ? 'a' : 'div';
+      const href = url ? ' href="' + esc(url) + '" target="_blank" rel="noopener noreferrer"' : '';
+      const cap = (it.title || it.desc)
+        ? '<div class="bn-cap"><div class="bn-cap-t">' + esc(it.title || '') + '</div>'
+          + (it.desc ? '<div class="bn-cap-d">' + esc(it.desc) + '</div>' : '') + '</div>'
+        : '';
+      return '<' + tag + ' class="bn-slide' + (i === 0 ? ' active' : '') + '"' + href + ' data-bn="' + i + '">'
+        + '<img class="bn-img" src="' + esc(it.image) + '" alt="' + esc(it.title || '') + '"/>' + cap
+        + '</' + tag + '>';
+    }).join('');
+    const dots = items.length > 1
+      ? '<div class="bn-dots">' + items.map(function (_, i) { return '<span class="bn-dot' + (i === 0 ? ' active' : '') + '" data-bdot="' + i + '"></span>'; }).join('') + '</div>'
+      : '';
+    return '<div class="bn-wrap" id="bnWrap"><div class="bn-viewport"><div class="bn-track" id="bnTrack">' + slides + '</div>'
+      + dots + '</div></div>';
+  }
+
+  function bindBanner(main) {
+    if (_bannerTimer) { clearInterval(_bannerTimer); _bannerTimer = null; }
+    const wrap = $('#bnWrap', main);
+    if (!wrap) return;
+    const track = $('#bnTrack', wrap);
+    const slides = track ? track.querySelectorAll('.bn-slide') : [];
+    const total = slides.length;
+    if (!track || total < 1) return;
+    const b = (content.config && content.config.banner) || {};
+    const interval = Math.max(1200, parseInt(b.interval, 10) || 3500);
+    _bannerIdx = 0;
+
+    function go(i) {
+      _bannerIdx = ((i % total) + total) % total;
+      track.classList.remove('dragging'); // 恢复过渡，平滑吸附到目标卡片
+      track.style.transform = 'translateX(-' + (_bannerIdx * 100) + '%)';
+      slides.forEach(function (s, k) { s.classList.toggle('active', k === _bannerIdx); });
+      wrap.querySelectorAll('.bn-dot').forEach(function (d, k) { d.classList.toggle('active', k === _bannerIdx); });
+    }
+    function play() { if (total > 1 && !_bannerTimer) _bannerTimer = setInterval(function () { go(_bannerIdx + 1); }, interval); }
+    function stop() { if (_bannerTimer) { clearInterval(_bannerTimer); _bannerTimer = null; } }
+
+    wrap.querySelectorAll('.bn-dot').forEach(function (d) {
+      d.addEventListener('click', function (e) { e.preventDefault(); e.stopPropagation(); stop(); go(parseInt(d.dataset.bdot, 10) || 0); play(); });
+    });
+
+    // 手机左右手势：手指移动时卡片实时跟手，松手按位移/速度吸附到相邻卡片
+    let sx = 0, sy = 0, lx = 0, lt = 0, vx = 0;
+    let dragging = false, horizontal = false, moved = false, suppressClick = false, basePx = 0, W = 0;
+
+    wrap.addEventListener('touchstart', function (e) {
+      if (e.touches.length !== 1 || total < 2) return;
+      const t = e.touches[0];
+      sx = lx = t.clientX; sy = t.clientY; lt = Date.now(); vx = 0;
+      dragging = true; horizontal = false; moved = false;
+      W = wrap.clientWidth || 1;
+      basePx = -_bannerIdx * W; // 当前卡片在像素坐标下的位置，与百分比 transform 等价
+      stop();
+    }, { passive: true });
+
+    wrap.addEventListener('touchmove', function (e) {
+      if (!dragging || e.touches.length !== 1) return;
+      const t = e.touches[0];
+      const dx = t.clientX - sx, dy = t.clientY - sy;
+      if (!horizontal) {
+        if (Math.abs(dx) < 8 || Math.abs(dx) <= Math.abs(dy)) return; // 纵向滚动交给页面
+        horizontal = true;
+        track.classList.add('dragging'); // 关掉过渡，让卡片跟着手指走
+      }
+      e.preventDefault();
+      moved = true;
+      const now = Date.now();
+      if (now > lt) { vx = (t.clientX - lx) / (now - lt); lx = t.clientX; lt = now; }
+      let off = dx;
+      if ((_bannerIdx === 0 && dx > 0) || (_bannerIdx === total - 1 && dx < 0)) off = dx * 0.32; // 首尾橡皮筋阻尼
+      track.style.transform = 'translate3d(' + (basePx + off) + 'px,0,0)';
+    }, { passive: false });
+
+    function finish(e) {
+      if (!dragging) return;
+      dragging = false;
+      const wasHorizontal = horizontal;
+      horizontal = false;
+      if (!wasHorizontal) { play(); return; }
+      const endX = e.changedTouches && e.changedTouches[0] ? e.changedTouches[0].clientX : sx;
+      const dx = endX - sx;
+      const far = Math.abs(dx) > W * 0.18 || Math.abs(dx) > 55;
+      const fast = Math.abs(vx) > 0.35 && Math.abs(dx) > 18; // 快速轻扫也算切换
+      suppressClick = moved; // 拖过就吞掉随后的 click，避免误跳链接
+      go((far || fast) ? _bannerIdx + (dx < 0 ? 1 : -1) : _bannerIdx);
+      play();
+    }
+    wrap.addEventListener('touchend', finish, { passive: true });
+    wrap.addEventListener('touchcancel', function () {
+      if (!dragging) return;
+      dragging = false; horizontal = false;
+      go(_bannerIdx);
+      play();
+    }, { passive: true });
+    wrap.addEventListener('click', function (e) {
+      if (suppressClick) { suppressClick = false; e.preventDefault(); e.stopPropagation(); }
+    }, true);
+
+    // 卡片被点跳走前先停掉定时器，避免后台空转
+    wrap.querySelectorAll('a.bn-slide').forEach(function (a) {
+      a.addEventListener('click', function () { stop(); });
+    });
+    play();
+  }
+
   let techToolsCfg = [];   // 供 bindTechExtra 的磁贴点击查找工具配置
 
   // 黑科技栏的「工具集合 / 链接分组 / 小工具 / 本地快捷方式」区（不含文章列表），供搜索栏接入
@@ -638,9 +756,10 @@
   }
 
   function renderTech(main) {
-    const extra = techExtraHtml();
+    const extra = bannerHtml() + techExtraHtml(); // 顶部横幅轮播（自动滑动卡片）
     renderList(main, 'tech', '黑科技 · 文章', extra);
     bindTechExtra(main);
+    bindBanner(main); // 顶部横幅轮播：自动播放 / 圆点 / 跟手手势
   }
 
   // 本地快捷方式入口块：低调的小字入口 + 折叠面板（后台「网址快捷方式」同款字段：名称/网址/介绍/图标/合集）

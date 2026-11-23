@@ -574,6 +574,40 @@
         + '<div class="coll-body"' + (open ? '' : ' style="display:none"') + '>' + inner + '</div></div>';
     }
 
+    // ===== 顶部轮播横幅：配置卡片内容（横图 + 跳转链接 + 自动播放间隔）=====
+    function bannerInner(cfg) {
+      const b = cfg.banner || {};
+      const items = Array.isArray(b.items) ? b.items : [];
+      let rows = '';
+      items.forEach(function (it, i) {
+        const thumb = it.image ? '<img class="bn-thumb" src="' + esc(it.image) + '" alt=""/>' : '<div class="bn-thumb bn-thumb-ph">无图</div>';
+        rows += '<div class="card adm-card" style="padding:10px 12px;margin-bottom:8px" data-bnrow="' + i + '">'
+          + '<div class="bn-adm-row">' + thumb
+          + '<div class="bn-adm-meta"><div class="card-title" style="font-size:14px">' + (i + 1) + '. ' + esc(it.title || '（未命名）') + '</div>'
+          + '<p class="card-desc" style="word-break:break-all">' + esc(it.url || '（未填链接，点击不跳转）') + '</p></div></div>'
+          + '<div class="adm-actions">'
+          + '<button class="btn ghost" data-bn-up="' + i + '">↑ 上移</button>'
+          + '<button class="btn ghost" data-bn-down="' + i + '">↓ 下移</button>'
+          + '<button class="btn ghost" data-bn-edit="' + i + '">编辑</button>'
+          + '<button class="btn danger" data-bn-del="' + i + '">删除</button></div></div>';
+      });
+      if (!rows) rows = '<div class="empty">还没有轮播卡片，在下方添加</div>';
+      const interval = Math.max(1200, parseInt(b.interval, 10) || 3500);
+      return '<div class="sub">🎠 自动滑动的横幅，类似广告位。可放多张横版图片，点击跳转链接，自动循环播放，同步适配浅色 / 暗调主题与公开端预览。</div>'
+        + '<div class="checkbox-row"><label class="switch"><input type="checkbox" id="b_enabled" ' + (b.enabled !== false ? 'checked' : '') + '/><span class="slider"></span></label><label for="b_enabled">启用轮播横幅</label></div>'
+        + '<div class="field"><label>每张停留时长：<span id="b_interval_v">' + interval + '</span> 毫秒（1200–15000，越小切得越快）</label><input type="range" id="b_interval" min="1200" max="15000" step="100" value="' + interval + '"/></div>'
+        + '<div class="sub" style="margin-top:12px">🖼 已添加的卡片（可用 ↑↓ 排序）</div>'
+        + '<div id="bn_list">' + rows + '</div>'
+        + '<div class="sub" style="margin-top:12px">➕ 添加新卡片</div>'
+        + '<div class="field"><label>横版图片（建议 900×280 以上横图，上传自动压缩）</label><input type="file" id="b_img_file" accept="image/*"/><img class="cover-preview" id="b_img_prev" style="display:none"/></div>'
+        + '<div class="field"><label>或图片网址（与上传二选一，填了优先用网址）</label><input type="text" id="b_img_url" placeholder="https://.../banner.jpg（留空则用上方上传的图）"/></div>'
+        + '<div class="field"><label>标题（可选，显示在图片左下角）</label><input type="text" id="b_title" placeholder="如：欢迎来到内容盒子"/></div>'
+        + '<div class="field"><label>副标题 / 描述（可选）</label><input type="text" id="b_desc" placeholder="一句话说明"/></div>'
+        + '<div class="field"><label>点击跳转链接（需以 http:// 或 https:// 开头，留空则不可点）</label><input type="text" id="b_url" placeholder="https://..."/></div>'
+        + '<div class="row"><button class="btn" id="b_add">添加卡片</button><button class="btn ghost" id="b_reset">清空表单</button></div>'
+        + '<p class="help">改动即时写入本机草稿并同步到下方「公开端预览」。改完点顶部「发布」推上线后所有人可见。横图比例建议 900:280，图片会自动等比裁切填充。</p>';
+    }
+
     // 「强制提示更新」：单独折叠卡片，避免站点设置面板过长
     // 老配置没有 closeOpacity 字段 → 默认 100（关闭按钮完全可见）
     const nCloseVal = n.closeOpacity == null ? 100
@@ -646,6 +680,7 @@
         + '<p class="help">内容气泡 = 文章/工具/小工具面板等卡片背景（含黑科技页「小工具」内容栏），数值越小越透；导航按钮 = 最上方「文章/黑科技/关于」三个切换按钮（不含上方标题），数值越小越透。</p>'
         )
       + collBlock('notice', '📢 强制提示更新（进入即弹窗 · 默认收纳）', noticeInner)
+      + collBlock('banner', '🎠 顶部轮播横幅（自动滑动）', bannerInner(c))
       + '<div class="row" style="margin-top:18px"><button class="btn" id="s_save">保存设置</button></div>'
       + '<p class="help">设置保存在本机草稿中，点「发布」推上线后所有人可见。改配色/壁纸时已实时预览本页效果。</p></div>';
 
@@ -857,6 +892,96 @@
       CBStore.saveDraft(content);
       toast('已保存');
     };
+
+    // ===== 顶部轮播横幅：配置交互 =====
+    const bnEnabled = $('#b_enabled');
+    const bnInterval = $('#b_interval');
+    const bnList = $('#bn_list');
+    let bnItems = JSON.parse(JSON.stringify((content.config.banner && content.config.banner.items) || []));
+    let bnEditIdx = -1;          // >=0 表示正在编辑该卡片
+    let bnUploadData = '';       // 当前上传压缩后的图片 dataURL
+
+    function bnCommit() {
+      content.config.banner = Object.assign(content.config.banner || {}, {
+        enabled: bnEnabled ? bnEnabled.checked : true,
+        interval: bnInterval ? Math.max(1200, parseInt(bnInterval.value, 10) || 3500) : 3500,
+        items: bnItems
+      });
+      CBStore.saveDraft(content);
+      pushPreview(); // 本项目 saveDraft 不含预览推送，手动补上，保证后台改动实时可见
+    }
+    function bnResetForm() {
+      bnEditIdx = -1; bnUploadData = '';
+      ['b_img_url', 'b_title', 'b_desc', 'b_url'].forEach(function (id) { const el = $('#' + id); if (el) el.value = ''; });
+      const f = $('#b_img_file'); if (f) f.value = '';
+      const pv = $('#b_img_prev'); if (pv) { pv.src = ''; pv.style.display = 'none'; }
+      const add = $('#b_add'); if (add) add.textContent = '添加卡片';
+    }
+    function bnRedrawList() {
+      if (!bnList) return;
+      let rows = '';
+      bnItems.forEach(function (it, i) {
+        const thumb = it.image ? '<img class="bn-thumb" src="' + esc(it.image) + '" alt=""/>' : '<div class="bn-thumb bn-thumb-ph">无图</div>';
+        rows += '<div class="card adm-card" style="padding:10px 12px;margin-bottom:8px">'
+          + '<div class="bn-adm-row">' + thumb
+          + '<div class="bn-adm-meta"><div class="card-title" style="font-size:14px">' + (i + 1) + '. ' + esc(it.title || '（未命名）') + '</div>'
+          + '<p class="card-desc" style="word-break:break-all">' + esc(it.url || '（未填链接，点击不跳转）') + '</p></div></div>'
+          + '<div class="adm-actions">'
+          + '<button class="btn ghost" data-bn-up="' + i + '">↑ 上移</button>'
+          + '<button class="btn ghost" data-bn-down="' + i + '">↓ 下移</button>'
+          + '<button class="btn ghost" data-bn-edit="' + i + '">编辑</button>'
+          + '<button class="btn danger" data-bn-del="' + i + '">删除</button></div></div>';
+      });
+      bnList.innerHTML = rows || '<div class="empty">还没有轮播卡片，在下方添加</div>';
+      bnBindListBtns();
+    }
+    function bnBindListBtns() {
+      bnList.querySelectorAll('[data-bn-up]').forEach(function (btn) {
+        btn.onclick = function () { const i = +btn.dataset.bnUp; if (i > 0) { const t = bnItems[i]; bnItems[i] = bnItems[i - 1]; bnItems[i - 1] = t; bnRedrawList(); bnCommit(); } };
+      });
+      bnList.querySelectorAll('[data-bn-down]').forEach(function (btn) {
+        btn.onclick = function () { const i = +btn.dataset.bnDown; if (i < bnItems.length - 1) { const t = bnItems[i]; bnItems[i] = bnItems[i + 1]; bnItems[i + 1] = t; bnRedrawList(); bnCommit(); } };
+      });
+      bnList.querySelectorAll('[data-bn-del]').forEach(function (btn) {
+        btn.onclick = function () { if (!confirm('确定删除这张轮播卡片？')) return; bnItems.splice(+btn.dataset.bnDel, 1); bnRedrawList(); bnCommit(); };
+      });
+      bnList.querySelectorAll('[data-bn-edit]').forEach(function (btn) {
+        btn.onclick = function () {
+          const i = +btn.dataset.bnEdit; const it = bnItems[i]; if (!it) return;
+          bnEditIdx = i; bnUploadData = it.image || '';
+          $('#b_img_url').value = ''; $('#b_title').value = it.title || ''; $('#b_desc').value = it.desc || ''; $('#b_url').value = it.url || '';
+          const pv = $('#b_img_prev'); if (pv && it.image) { pv.src = it.image; pv.style.display = 'block'; }
+          const add = $('#b_add'); if (add) { add.textContent = '保存修改'; add.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
+        };
+      });
+    }
+    if (bnEnabled) bnEnabled.addEventListener('change', bnCommit);
+    if (bnInterval) bnInterval.addEventListener('input', function () { const v = $('#b_interval_v'); if (v) v.textContent = bnInterval.value; bnCommit(); });
+
+    const bFile = $('#b_img_file');
+    if (bFile) bFile.onchange = async function (e) {
+      const f = e.target.files && e.target.files[0]; if (!f) return;
+      try {
+        bnUploadData = await CBStore.fileToResizedDataURL(f, 1000, 0.85);
+        const pv = $('#b_img_prev'); if (pv) { pv.src = bnUploadData; pv.style.display = 'block'; }
+      } catch (err) { toast('图片处理失败'); }
+    };
+    const bAdd = $('#b_add');
+    if (bAdd) bAdd.onclick = function () {
+      const urlVal = ($('#b_img_url').value || '').trim();
+      const image = /^https?:\/\//i.test(urlVal) ? urlVal : bnUploadData;
+      if (!image) { toast('请上传图片或填写图片网址'); return; }
+      const link = ($('#b_url').value || '').trim();
+      if (link && !/^https?:\/\//i.test(link)) { toast('跳转链接需以 http:// 或 https:// 开头'); return; }
+      const obj = { id: CBStore.uid(), image: image, title: ($('#b_title').value || '').trim(), desc: ($('#b_desc').value || '').trim(), url: link };
+      const wasEdit = bnEditIdx >= 0; // 先记下，bnResetForm 会把 bnEditIdx 清掉
+      if (bnEditIdx >= 0 && bnItems[bnEditIdx]) { obj.id = bnItems[bnEditIdx].id; bnItems[bnEditIdx] = obj; }
+      else bnItems.push(obj);
+      bnResetForm(); bnRedrawList(); bnCommit(); toast(wasEdit ? '已保存修改' : '已添加卡片');
+    };
+    const bReset = $('#b_reset');
+    if (bReset) bReset.onclick = bnResetForm;
+    if (bnList) bnBindListBtns();
   }
 
   function defaultToolsConfig() {
