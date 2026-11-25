@@ -70,7 +70,7 @@
     ],
     "author": {
       "name": "酷白.Abai",
-      "intro": "Ai做着玩\n因无☁️云端服务器，因此版本更新、新增内容可能需重新进入网页或从新下载最新安装包：目前测试手机端安装APP后重新进APP会自动刷新最新内容\n站点官网：https://2118301017820069888.app.workbuddy.host/?sharecode=LXZ6WX2ERL\n\n\n版本：26.11.24（2.1）v96\n开发:26.10.27.16.09.30"
+      "intro": "Ai做着玩\n因无☁️云端服务器，因此版本更新、新增内容可能需重新进入网页或从新下载最新安装包：目前测试手机端安装APP后重新进APP会自动刷新最新内容\n站点官网：https://2118301017820069888.app.workbuddy.host/?sharecode=LXZ6WX2ERL\n\n\n版本：26.11.25（2.1）v99\n开发:26.10.27.16.09.30"
     },
     "apkUrl": "https://2118301017820069888.app.workbuddy.host/guide.html?sharecode=LXZ6WX2ERL",
     "icon": "",
@@ -140,7 +140,7 @@
         "description": "支持五大平台曲库的在线音乐站点",
         "icon": "assets/img-af399c0d9191.jpg?sharecode=LXZ6WX2ERL",
         "groupId": "g_pmvta2f9k06b3q",
-        "order": 1,
+        "order": 4,
         "showUrl": false
       },
       {
@@ -150,6 +150,16 @@
         "description": "",
         "icon": "assets/img-079014604478.jpg?sharecode=LXZ6WX2ERL",
         "order": 2
+      },
+      {
+        "id": "pmwwa1xva9bqnw",
+        "title": "云播TV",
+        "url": "https://www.yunbo.net/",
+        "description": "无广 | 弹幕 | 在线追剧 | 网盘资源",
+        "icon": "data:image/jpeg;base64,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",
+        "showUrl": false,
+        "order": 1,
+        "groupId": "g_pmvta2f9k06b3q"
       }
     ],
     "linkGroups": [
@@ -164,7 +174,7 @@
         "order": 2
       }
     ],
-    "aboutApp": "Abai的内容盒子\n作者：酷白.Abai\n\nAI做着玩。用来为使用工具寻找工具提供便捷使用，作者的工具存放站.\n这是一个可安装到手机的 PWA 内容 App。联网更新内容并重新打开即可同步，无需云端账号。\n\n版26.11.24（2.1）v96\n公众号：星海里找尘埃",
+    "aboutApp": "Abai的内容盒子\n作者：酷白.Abai\n\nAI做着玩。用来为使用工具寻找工具提供便捷使用，作者的工具存放站.\n这是一个可安装到手机的 PWA 内容 App。联网更新内容并重新打开即可同步，无需云端账号。\n\n版26.11.25（2.1）v99\n公众号：星海里找尘埃",
     "installText": "已配置 APK 链接，可直接下载安装包，离线也能用，点击下方一键安装即可",
     "guide": {
       "enabled": true,
@@ -284,7 +294,7 @@
     {
       "title": "新增工具介绍",
       "category": "tech",
-      "summary": "新增：小说搜索引擎、魔力音乐",
+      "summary": "热新增更好用的影视站点：云播TV【干净、ui很好、追剧流畅】",
       "content": "v42\n新增：小说搜索引擎 \n这是一个网络小说搜索引擎，同一本小说可能搜出多个渠道，推荐首个，部分渠道含广告，广告谨慎点击！\n>已归纳到效率工具箱\n\n魔力音乐\n支持五大平台曲库的在线音乐站点，全部免费听且下载\n>已归纳到影视-音乐\n\nv39\n已增加类目收纳分类：影视-音乐、效率工具箱\n落雪TV：\n聚合国产影视动漫为主，内置含CCTV电视直播、在线解析影片工具等\n\nTvTFun:\n专注日本动漫追番站点，基本不含国内影视\n\nv19\n一个木函-多功能效率工具箱：\n主用方面：图片格式转换、压缩、GIF合成....文本工具，视频工具。查询工具：以图搜番、bilibili封面获取...等常用工具\n更多可直接快捷打开后查看\n\n兽音译者\n众所周知，对内容进行文字加密，翻译转换成各种兽语，负责编码解密-加密兽语\n可直接快捷打开官网\n\n第三方工具网内广告谨慎点击！",
       "cover": "assets/img-d46a15195662.jpg?sharecode=LXZ6WX2ERL",
       "pinned": false,
@@ -292,10 +302,11 @@
       "published": true,
       "id": "pmvrs68a0onumn",
       "createdAt": "2026-10-28T07:16:09.192Z",
-      "updatedAt": "2026-11-03T05:37:29.245Z",
+      "updatedAt": "2026-11-25T15:41:44.451Z",
       "coverShape": "square",
       "displayMode": "chat",
       "chatSegments": [
+        "v99\n热门工具新增更好用的影视站点：云播TV【干净、ui很好、追剧流畅】\n黑科技栏横幅加入了福利：流量卡领取【里面流量卡都是免费领取，官方卡自动放出低月租大流量卡，卡不是一直存在，官方下架就没有了只能等再次上架，有大流量需求的朋友可以自行进去查看】\n优化页面流畅度\n调整影视站点板块：\n手机进入热门工具里的影视站点看视频的时候点视频展开全屏播放，可能会出现视频画面不旋转横屏的线下，这是app端口问题，解决方案：点击全屏播放后，画面是竖屏的只需将手机旋转至横屏，左下角会出现旋转按键，点击视频将会旋转为横屏模式。也在影视站点上方增加跳转浏览器打开，浏览器打开观看视频可正常横屏播放\n",
         "v42\n新增：小说搜索引擎 \n这是一个网络小说搜索引擎，同一本小说可能搜出多个渠道，推荐首个，部分渠道含广告，广告谨慎点击！",
         ">已归纳到效率工具箱",
         "魔力音乐\n支持五大平台曲库的在线音乐站点，全部免费听且下载\n>已归纳到影视-音乐",
@@ -311,15 +322,15 @@
     {
       "title": "公告📢",
       "category": "article",
-      "summary": "26.11.24（2.1）v96版本最新更新内容：",
-      "content": "内容盒子26.11.24（2.1）v96\n界面介绍：主界面提供【内容】【黑科技】主状态栏\n内容栏：主要提供公告发布及使用技巧等有效内容提供，后续将会逐步扩充\n黑科技栏：主要提供小工具及作者或内置更新补充一些实用工具和网点共快捷使用\n目前内置有多个小工具 > 小工具栏在底部\n\n最新更新：\n（2.1）v90\n更新迭代安装包\n\n（1.9）v87\nv66\n修复本地bug\n优化网页端、手机端、本地端适配\n优化浅色主题/暗调主题，不同主题界面显示\n\nv62\n优化程序 \n\nv56\n修复多个bug\n优化界面流畅及UI美化\n修改了黑科技栏布局排版\n新增多个内置小工具，已添加至黑科技栏最底下 > 小工具栏\n\n\n\n\nV42\n效率工具箱新增：小说搜索引擎\n影视-音乐栏新增：魔力音乐\n\nV41\n新增多个快捷工具箱：\n效率工具类：一个木函-多功能效率工具箱、兽音译者\n影视类：落雪TV、TvTFun\n具体工具用法介绍查看工具栏公告\n\n界面功能新增：浅色主题/暗调主题切换 [ 关于栏下面可自主切换：记忆本机：切换后下次进入将保留上次主题模式 ]\n\n优化：\n提升整体界面的观感，增加了状态栏及内容卡片的气泡透明度状态\n\n优化整体流畅度、加载速度\n手机端优化了开屏白屏延迟问题，加载流畅度提升\n手机端优化了在打开一篇内容或者工具箱时，用手机返回键操作后直接退出APP的bug\n手机端打开内置快捷工具箱网点可直接APP内直开，不会跳转浏览器，减少不必要的跳转和延迟，提升便捷使用\n\n\n作者：酷白.Abai\n公众号：星海里找尘埃\n有问题或者好用的工具站点有想法扩充可到公众号反馈，谢谢",
+      "summary": "26.11.25（2.1）v99版本最新更新内容：",
+      "content": "界面介绍：主界面提供【内容】【黑科技】主状态栏\n内容栏：主要提供公告发布及使用技巧等有效内容提供，后续将会逐步扩充\n黑科技栏：主要提供小工具及作者或内置更新补充一些实用工具和网点共快捷使用\n目前内置有多个小工具 > 小工具栏在底部\n\n最新更新：\nv99\n热门工具新增更好用的影视站点：云播TV【干净、ui很好、追剧流畅】\n黑科技栏横幅加入了福利：流量卡领取【里面流量卡都是免费领取，官方卡自动放出低月租大流量卡，卡不是一直存在，官方下架就没有了只能等再次上架，有大流量需求的朋友可以自行进去查看】\n优化页面流畅度\n调整影视站点板块：\n手机进入热门工具里的影视站点看视频的时候点视频展开全屏播放，可能会出现视频画面不旋转横屏的线下，这是app端口问题，解决方案：点击全屏播放后，画面是竖屏的只需将手机旋转至横屏，左下角会出现旋转按键，点击视频将会旋转为横屏模式。也在影视站点上方增加跳转浏览器打开，浏览器打开观看视频可正常横屏播放\n\n\n\n（2.1）v90\n更新迭代安装包\n\n（1.9）v87\nv66\n修复本地bug\n优化网页端、手机端、本地端适配\n优化浅色主题/暗调主题，不同主题界面显示\n\nv62\n优化程序 \n\nv56\n修复多个bug\n优化界面流畅及UI美化\n修改了黑科技栏布局排版\n新增多个内置小工具，已添加至黑科技栏最底下 > 小工具栏\n\n\n\n\nV42\n效率工具箱新增：小说搜索引擎\n影视-音乐栏新增：魔力音乐\n\nV41\n新增多个快捷工具箱：\n效率工具类：一个木函-多功能效率工具箱、兽音译者\n影视类：落雪TV、TvTFun\n具体工具用法介绍查看工具栏公告\n\n界面功能新增：浅色主题/暗调主题切换 [ 关于栏下面可自主切换：记忆本机：切换后下次进入将保留上次主题模式 ]\n\n优化：\n提升整体界面的观感，增加了状态栏及内容卡片的气泡透明度状态\n\n优化整体流畅度、加载速度\n手机端优化了开屏白屏延迟问题，加载流畅度提升\n手机端优化了在打开一篇内容或者工具箱时，用手机返回键操作后直接退出APP的bug\n手机端打开内置快捷工具箱网点可直接APP内直开，不会跳转浏览器，减少不必要的跳转和延迟，提升便捷使用\n\n\n作者：酷白.Abai\n公众号：星海里找尘埃\n有问题或者好用的工具站点有想法扩充可到公众号反馈，谢谢",
       "cover": "assets/img-4c43949c2e22.jpg?sharecode=LXZ6WX2ERL",
       "pinned": true,
       "order": 9,
       "published": true,
       "id": "pmvsvv19kln67b",
       "createdAt": "2026-10-29T01:47:11.528Z",
-      "updatedAt": "2026-11-23T18:35:02.962Z",
+      "updatedAt": "2026-11-25T15:39:39.042Z",
       "coverShape": "landscape",
       "displayMode": "normal",
       "chatSegments": [
@@ -394,17 +405,18 @@
     }
   ],
   "deployMeta": {
-    "ts": "1793986153106",
+    "ts": "1795621454527",
     "changedIds": [
+      "pmvrs68a0onumn",
+      "pmvsvv19kln67b"
+    ],
+    "unchangedIds": [
       "p_seed1",
       "p_seed2",
       "p_seed3",
-      "pmvrs68a0onumn",
-      "pmvsvv19kln67b",
       "pmvz2b10zgl5gx",
       "pmvz2bilepeni3",
       "pmvz2c7j6eq4k3"
-    ],
-    "unchangedIds": []
+    ]
   }
 }
