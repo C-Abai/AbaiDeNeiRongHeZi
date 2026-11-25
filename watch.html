@@ -11,81 +11,71 @@
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body { height: 100%; background: #000; overflow: hidden; color: #fff;
     font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif; }
-  #bar { position: fixed; top: 0; left: 0; right: 0; height: 48px;
-    display: flex; align-items: center; gap: 8px; padding: 0 10px;
-    padding-top: env(safe-area-inset-top);
+  #bar { position: fixed; top: 0; left: 0; right: 0; z-index: 10;
+    display: flex; align-items: center; gap: 10px;
+    padding: 6px 10px; padding-top: calc(6px + env(safe-area-inset-top));
     background: rgba(15, 17, 21, .82); backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px); z-index: 10; }
-  #bar .t { flex: 1; font-size: 14px; font-weight: 600; white-space: nowrap;
-    overflow: hidden; text-overflow: ellipsis; }
-  #bar button { border: none; background: rgba(255, 255, 255, .16); color: #fff;
-    font-size: 13px; padding: 7px 11px; border-radius: 9px; }
-  #bar button:active { background: rgba(255, 255, 255, .3); }
-  #fsBtn { background: #07c160 !important; font-weight: 700; }
-  #frame { position: fixed; top: 48px; left: 0; right: 0; bottom: 0;
-    width: 100%; height: calc(100% - 48px); border: 0; background: #000; }
-  #hint { position: fixed; left: 50%; transform: translateX(-50%); bottom: 18px;
-    background: rgba(0, 0, 0, .62); color: #fff; font-size: 12px;
-    padding: 8px 14px; border-radius: 20px; z-index: 10; opacity: 0;
-    transition: opacity .3s; pointer-events: none; max-width: 90%; text-align: center; }
-  #hint.show { opacity: 1; }
-  /* 横屏全屏：让 iframe 充满横屏视口 */
-  #bar:fullscreen { display: none; }
-  #frame:fullscreen { top: 0; height: 100%; }
+    -webkit-backdrop-filter: blur(8px); }
+  #bar .tip { flex: 1; font-size: 11px; line-height: 1.4; color: #c9ced6; }
+  #bar button { flex: none; border: none; background: #07c160; color: #fff;
+    font-size: 12px; font-weight: 700; padding: 7px 10px; border-radius: 8px; white-space: nowrap; }
+  #bar button:active { background: #06a852; }
+  #frame { position: fixed; left: 0; right: 0; bottom: 0; width: 100%;
+    border: 0; background: #000; }
 </style>
 </head>
 <body>
 <div id="bar">
-  <button id="backBtn">‹ 返回</button>
-  <div class="t" id="title">影视</div>
-  <button id="refreshBtn">刷新</button>
-  <button id="openExt">↗ 浏览器打开</button>
-  <button id="fsBtn">横屏全屏</button>
+  <div class="tip">若视频没旋转，将手机转成横屏，点左下角旋转按钮即可</div>
+  <button id="openBrowser" type="button">浏览器打开 ↗</button>
 </div>
-<iframe id="frame" allow="autoplay; encrypted-media; fullscreen; picture-in-picture; accelerometer; gyroscope"
+<iframe id="frame" allow="autoplay; encrypted-media; fullscreen; picture-in-picture; accelerometer; gyroscope; screen-orientation"
   referrerpolicy="no-referrer"
-  sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-presentation allow-modals"></iframe>
-<div id="hint">已尝试横屏全屏 · 若设备仍竖屏，请在系统中开启「自动旋转」</div>
+  allowfullscreen="true" webkitallowfullscreen="true" mozallowfullscreen="true"
+  sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-presentation allow-modals allow-orientation-lock"></iframe>
 <script>
   (function () {
     var q = new URLSearchParams(location.search);
-    var url = q.get('url');
-    var name = q.get('name') || '影视';
-    document.getElementById('title').textContent = name;
+    var url = q.get('url') || '';
     var frame = document.getElementById('frame');
+    // 提示栏高度 -> iframe 从栏下方铺满，不遮挡站点内容
+    function layout() {
+      var h = document.getElementById('bar').offsetHeight;
+      frame.style.top = h + 'px';
+      frame.style.height = 'calc(100% - ' + h + 'px)';
+    }
+    layout();
+    window.addEventListener('resize', layout);
     if (url) frame.src = url;
-    document.getElementById('backBtn').onclick = function () {
-      if (history.length > 1) history.back(); else location.href = './';
-    };
-    document.getElementById('openExt').onclick = function () {
-      if (url) window.open(url, '_blank');
-    };
-    document.getElementById('refreshBtn').onclick = function () {
-      try { frame.contentWindow.location.reload(); } catch (e) { frame.src = frame.src; }
-    };
-    var hint = document.getElementById('hint');
-    function showHint() { hint.classList.add('show'); setTimeout(function () { hint.classList.remove('show'); }, 2800); }
-    document.getElementById('fsBtn').onclick = function () {
-      var el = document.documentElement;
-      var doFs = function () {
-        if (el.requestFullscreen) el.requestFullscreen().catch(function () {});
-        else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
-        if (screen.orientation && screen.orientation.lock) {
-          screen.orientation.lock('landscape').then(function () { showHint(); }).catch(function () { showHint(); });
-        } else { showHint(); }
-      };
-      doFs();
-    };
-    document.addEventListener('fullscreenchange', function () {
-      if (!document.fullscreenElement && screen.orientation && screen.orientation.unlock) {
-        try { screen.orientation.unlock(); } catch (e) {}
+
+    // 主题跟随（新站机制：cb_user_dim='0' 用户选浅色 -> 浅底深字细栏；'1'/null 用深色）
+    try {
+      if (localStorage.getItem('cb_user_dim') === '0') {
+        var bar = document.getElementById('bar'), tip = bar.querySelector('.tip');
+        bar.style.background = 'rgba(255,255,255,.92)';
+        tip.style.color = '#4a525d';
       }
-    });
-    document.addEventListener('webkitfullscreenchange', function () {
-      if (!document.webkitFullscreenElement && screen.orientation && screen.orientation.unlock) {
-        try { screen.orientation.unlock(); } catch (e) {}
+    } catch (e) {}
+
+    // 「浏览器打开」：安卓用 intent 唤起系统浏览器（实测可跳出并横屏）；其他平台兜底新窗口
+    document.getElementById('openBrowser').onclick = function () {
+      if (!url) return;
+      var target = url;
+      if (/Android/i.test(navigator.userAgent || '')) {
+        var m = /^(https?):\/\/([^\s#]+)$/i.exec(url);
+        if (m) {
+          target = 'intent://' + m[2] + '#Intent;scheme=' + m[1]
+            + ';S.browser_fallback_url=' + encodeURIComponent(url) + ';end';
+        }
       }
-    });
+      var a = document.createElement('a');
+      a.href = target;
+      a.target = '_blank';
+      a.rel = 'noopener noreferrer';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    };
   })();
 </script>
 </body>
