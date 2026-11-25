@@ -115,17 +115,41 @@
       }, 1500);
     });
   }
-  // 更新气泡：仅在「SW 接管触发的那次刷新」出现一次（首页小气泡，不占屏）。
-  // 在 controllerchange→reload 前打 sessionStorage 标记，刷新后读到此标记即弹一次并清除。
-  function maybeShowUpdateToast() {
-    let flag = null;
-    try { flag = sessionStorage.getItem('cb_updated_toast'); } catch (e) {}
-    if (!flag) return;
-    try { sessionStorage.removeItem('cb_updated_toast'); } catch (e) {}
-    getSwVersion().then(function (v) {
-      const num = v ? (v.split('-v')[1] || v).replace(/^v/, '') : '';
-      showVersionToast(num ? ('✓ 已更新到最新版本 v' + num) : '✓ 已更新到最新版本');
+  // 主动读线上 sw.js 的 CACHE 版本：pv=1 让 SW 放行直接走网络，时间戳破 HTTP 缓存。
+  // 旧版靠 getSwVersion() 的 postMessage 往返拿版本号，reload 后 controller 未就绪时
+  // 会拿到空值、甚至整窗漏弹，这就是「更新后不再弹 vXX 提示」的根因。
+  function fetchSwVer() {
+    return fetch('./sw.js?sharecode=LXZ6WX2ERL&pv=1&_v=' + Date.now(), { cache: 'no-store' })
+      .then(function (r) { return r.text(); })
+      .then(function (t) {
+        const m = t.match(/const\s+CACHE\s*=\s*['"]([^'"]+)['"]/);
+        return m ? m[1] : null;
+      })
+      .catch(function () { return null; });
+  }
+  function fireUpdateToast(v) {
+    const num = swVersionNum(v);
+    showVersionToast(num ? ('✓ 已更新到最新版本 v' + num) : '✓ 已更新到最新版本');
+  }
+  // 更新提示（v98 重写）：两条触发路径都不依赖 SW 消息往返
+  // ① controllerchange→reload 前把版本号写进 sessionStorage，reload 后直接弹（带版本号）；
+  // ② SW 在后台静默更新（本页没经历 reload）时，用「线上版本 vs 本地记录」对比补弹一次，首次只记不弹。
+  const SW_VER_KEY = 'cb_last_sw_ver';
+  function checkUpdateToast() {
+    fetchSwVer().then(function (v) {
+      if (!v) return;
+      let seen = null;
+      try { seen = localStorage.getItem(SW_VER_KEY); } catch (e) {}
+      try { localStorage.setItem(SW_VER_KEY, v); } catch (e) {}
+      if (seen && seen !== v) fireUpdateToast(v); // 有旧记录且版本变了才弹；首次只记录不弹
     });
+  }
+  function maybeShowUpdateToast() {
+    let pending = null;
+    try { pending = sessionStorage.getItem('cb_updated_toast'); } catch (e) {}
+    try { sessionStorage.removeItem('cb_updated_toast'); } catch (e) {}
+    if (pending) checkUpdateToast();             // SW 接管触发的 reload：立刻检查并弹
+    else setTimeout(checkUpdateToast, 1500);     // 冷启动 / 后台静默更新：兜底延迟检查
   }
 
   // 解析当前部署的 SW 版本号（取「内容盒子-Vxx」里的数字），用于公开端「关于」页底部显示。
@@ -234,7 +258,7 @@
       });
       // 注册 URL 带 &v= 版本号：每次部署脚本地址都不同，浏览器必须重新下载 SW，
       // 不再依赖对 sw.js 的 HTTP 缓存复用，从而「一次刷新就生效」，杜绝反复刷新才更新的卡顿。
-      navigator.serviceWorker.register('sw.js?sharecode=LXZ6WX2ERL&v=97').then(function (reg) {
+      navigator.serviceWorker.register('sw.js?sharecode=LXZ6WX2ERL&v=98').then(function (reg) {
         if (!reg) return;
         // 主动触发一次更新检查（register 本身也会检查，这里再兜一层，缩短检测时延）
         if (reg.update) { try { reg.update(); } catch (e) {} }

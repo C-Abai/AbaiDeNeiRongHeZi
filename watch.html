@@ -4,9 +4,6 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <title>影视观看</title>
-<!-- 51.la 统计 SDK（静态写死，过检测） -->
-<script charset="UTF-8" id="LA_COLLECT" src="//sdk.51.la/js-sdk-pro.min.js"></script>
-<script>LA.init({id:"3RpzfUTqlbeltGdX",ck:"3RpzfUTqlbeltGdX",autoTrack:true,hashMode:false,showWidget:false})</script>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body { height: 100%; background: #000; overflow: hidden; color: #fff;
@@ -22,6 +19,15 @@
   #bar button:active { background: #06a852; }
   #frame { position: fixed; left: 0; right: 0; bottom: 0; width: 100%;
     border: 0; background: #000; }
+  /* v98：iframe 加载期间的占位提示，避免纯黑屏「卡住」观感；frame load 后淡出 */
+  #loading { position: fixed; left: 0; right: 0; bottom: 0; z-index: 5;
+    display: flex; align-items: center; justify-content: center; gap: 9px;
+    background: #0b0d10; color: #8b929c; font-size: 13px;
+    transition: opacity .25s ease; }
+  #loading .spin { width: 15px; height: 15px; border: 2px solid rgba(255,255,255,.18);
+    border-top-color: #07c160; border-radius: 50%; animation: cbspin .7s linear infinite; }
+  @keyframes cbspin { to { transform: rotate(360deg); } }
+  #loading.hide { opacity: 0; pointer-events: none; }
 </style>
 </head>
 <body>
@@ -29,6 +35,7 @@
   <div class="tip">若视频没旋转，将手机转成横屏，点左下角旋转按钮即可</div>
   <button id="openBrowser" type="button">浏览器打开 ↗</button>
 </div>
+<div id="loading"><span class="spin"></span><span>正在加载影视站点…</span></div>
 <iframe id="frame" allow="autoplay; encrypted-media; fullscreen; picture-in-picture; accelerometer; gyroscope; screen-orientation"
   referrerpolicy="no-referrer"
   allowfullscreen="true" webkitallowfullscreen="true" mozallowfullscreen="true"
@@ -38,15 +45,36 @@
     var q = new URLSearchParams(location.search);
     var url = q.get('url') || '';
     var frame = document.getElementById('frame');
-    // 提示栏高度 -> iframe 从栏下方铺满，不遮挡站点内容
+    var loading = document.getElementById('loading');
+    // 提示栏高度 -> iframe / 占位层从栏下方铺满，不遮挡站点内容
     function layout() {
       var h = document.getElementById('bar').offsetHeight;
       frame.style.top = h + 'px';
       frame.style.height = 'calc(100% - ' + h + 'px)';
+      loading.style.top = h + 'px';
     }
     layout();
     window.addEventListener('resize', layout);
-    if (url) frame.src = url;
+    // v98：iframe 真正加载出来后再淡出占位，消除「黑屏延迟一下」的观感
+    frame.addEventListener('load', function () { loading.classList.add('hide'); });
+    // 兜底：部分站点跨域/无 load 事件，8s 后强制收起占位，避免一直转圈
+    setTimeout(function () { loading.classList.add('hide'); }, 8000);
+    if (url) {
+      // 提前与目标站点建立连接，缩短 iframe 首包等待
+      try {
+        var m = /^(https?):\/\/([^\/]+)/.exec(url);
+        if (m) {
+          var pre = document.createElement('link');
+          pre.rel = 'preconnect';
+          pre.href = m[1] + '://' + m[2];
+          pre.crossOrigin = 'anonymous';
+          document.head.appendChild(pre);
+        }
+      } catch (e) {}
+      frame.src = url;
+    } else {
+      loading.classList.add('hide');
+    }
 
     // 主题跟随（新站机制：cb_user_dim='0' 用户选浅色 -> 浅底深字细栏；'1'/null 用深色）
     try {
@@ -54,6 +82,8 @@
         var bar = document.getElementById('bar'), tip = bar.querySelector('.tip');
         bar.style.background = 'rgba(255,255,255,.92)';
         tip.style.color = '#4a525d';
+        loading.style.background = '#eef0f3';
+        loading.style.color = '#6b7280';
       }
     } catch (e) {}
 
@@ -62,9 +92,9 @@
       if (!url) return;
       var target = url;
       if (/Android/i.test(navigator.userAgent || '')) {
-        var m = /^(https?):\/\/([^\s#]+)$/i.exec(url);
-        if (m) {
-          target = 'intent://' + m[2] + '#Intent;scheme=' + m[1]
+        var b = /^(https?):\/\/([^\s#]+)$/i.exec(url);
+        if (b) {
+          target = 'intent://' + b[2] + '#Intent;scheme=' + b[1]
             + ';S.browser_fallback_url=' + encodeURIComponent(url) + ';end';
         }
       }
@@ -78,5 +108,8 @@
     };
   })();
 </script>
+<!-- v98：51.la 脚本移到 body 末尾，避免同步脚本阻塞 <head> 解析造成黑屏；检测代码原样静态写死 -->
+<script charset="UTF-8" id="LA_COLLECT" src="//sdk.51.la/js-sdk-pro.min.js"></script>
+<script>LA.init({id:"3RpzfUTqlbeltGdX",ck:"3RpzfUTqlbeltGdX",autoTrack:true,hashMode:false,showWidget:false})</script>
 </body>
 </html>

@@ -1,4 +1,4 @@
-const CACHE = 'contentbox-v97';
+const CACHE = 'contentbox-v98';
 const SC = 'LXZ6WX2ERL';
 const ASSETS = [
   './index.html?sharecode=' + SC,
@@ -125,6 +125,26 @@ self.addEventListener('fetch', (event) => {
   // raw 副本，造成老内容残留、缓存膨胀，也是「刷新好多遍才是新内容」的帮凶。
   if (url.indexOf('content.json') > -1 || url.indexOf('meta.json') > -1) {
     event.respondWith(fetch(req));
+    return;
+  }
+  // 【v98】影视观看页 watch.html 是纯壳（目标站点由 ?url= 动态注入），内容几乎不变。
+  // 旧版把它归在 navigate→netFirst，每次点影视快捷站点都要等网络往返，表现为「先黑屏再出界面」。
+  // 改为缓存优先秒开：壳立即呈现（含加载提示），目标站点 iframe 并行加载，消除黑屏等待。
+  if (url.indexOf('watch.html') > -1) {
+    event.respondWith(
+      caches.open(CACHE).then((cache) =>
+        // ignoreSearch：watch.html?url=xxx 与预缓存的 watch.html?sharecode=xxx 视为同一壳，命中秒开
+        cache.match(req, { ignoreSearch: true }).then((cached) => {
+          const network = fetch(new Request(req, { cache: 'reload' }))
+            .then((res) => {
+              if (res && res.status === 200) cache.put(req, res.clone());
+              return res;
+            })
+            .catch(() => cached);
+          return cached || network;
+        })
+      )
+    );
     return;
   }
   // 导航请求（HTML 文档）与后台页：网络优先，确保每次扫码 / 打开都是最新页面
