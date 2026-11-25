@@ -131,25 +131,26 @@
     const num = swVersionNum(v);
     showVersionToast(num ? ('✓ 已更新到最新版本 v' + num) : '✓ 已更新到最新版本');
   }
-  // 更新提示（v98 重写）：两条触发路径都不依赖 SW 消息往返
-  // ① controllerchange→reload 前把版本号写进 sessionStorage，reload 后直接弹（带版本号）；
-  // ② SW 在后台静默更新（本页没经历 reload）时，用「线上版本 vs 本地记录」对比补弹一次，首次只记不弹。
+  // 更新提示（v99 重写）：触发路径不再依赖「本地旧记录存在」这一前提
+  // ① 经历过 SW 接管触发的 reload（sessionStorage 有标记）→ 无条件弹，不比对本地记录；
+  //    旧版「首次只记录不弹」会让从旧机制升级上来的那一版永远看不到气泡，这是本次漏弹主因。
+  // ② 冷启动 / 后台静默更新（本页没经历 reload）→ 线上版本与本地记录不同才弹。
   const SW_VER_KEY = 'cb_last_sw_ver';
-  function checkUpdateToast() {
+  function checkUpdateToast(force) {
     fetchSwVer().then(function (v) {
       if (!v) return;
       let seen = null;
       try { seen = localStorage.getItem(SW_VER_KEY); } catch (e) {}
       try { localStorage.setItem(SW_VER_KEY, v); } catch (e) {}
-      if (seen && seen !== v) fireUpdateToast(v); // 有旧记录且版本变了才弹；首次只记录不弹
+      if (force || (seen && seen !== v)) fireUpdateToast(v);
     });
   }
   function maybeShowUpdateToast() {
     let pending = null;
     try { pending = sessionStorage.getItem('cb_updated_toast'); } catch (e) {}
     try { sessionStorage.removeItem('cb_updated_toast'); } catch (e) {}
-    if (pending) checkUpdateToast();             // SW 接管触发的 reload：立刻检查并弹
-    else setTimeout(checkUpdateToast, 1500);     // 冷启动 / 后台静默更新：兜底延迟检查
+    if (pending) checkUpdateToast(true);                       // SW 更新触发的刷新：无条件弹
+    else setTimeout(function () { checkUpdateToast(false); }, 1500); // 冷启动兜底：版本变化才弹
   }
 
   // 解析当前部署的 SW 版本号（取「内容盒子-Vxx」里的数字），用于公开端「关于」页底部显示。
@@ -258,7 +259,7 @@
       });
       // 注册 URL 带 &v= 版本号：每次部署脚本地址都不同，浏览器必须重新下载 SW，
       // 不再依赖对 sw.js 的 HTTP 缓存复用，从而「一次刷新就生效」，杜绝反复刷新才更新的卡顿。
-      navigator.serviceWorker.register('sw.js?sharecode=LXZ6WX2ERL&v=98').then(function (reg) {
+      navigator.serviceWorker.register('sw.js?sharecode=LXZ6WX2ERL&v=99').then(function (reg) {
         if (!reg) return;
         // 主动触发一次更新检查（register 本身也会检查，这里再兜一层，缩短检测时延）
         if (reg.update) { try { reg.update(); } catch (e) {} }
@@ -275,8 +276,11 @@
           });
         });
       }).catch(function () {});
-      // 更新部署后刷新时，弹一次「已更新最新版本」小气泡（仅 SW 接管触发的刷新才会触发）
-      if (navigator.serviceWorker.ready) navigator.serviceWorker.ready.then(maybeShowUpdateToast).catch(function () {});
+      // 更新部署后刷新时，弹一次「已更新最新版本」小气泡。
+      // v99：直接调用，不再挂在 serviceWorker.ready 上——安卓 standalone/WebView 下
+      // ready 可能迟迟不 resolve，导致刷新标记写了却永远读不到、气泡漏弹。
+      // fetchSwVer() 自己走网络（pv=1 已被 SW 放行），无需等 SW 就绪。
+      maybeShowUpdateToast();
     }
     const cached = CBStore.getCached();
     if (cached) { content = cached; paint(); }            // 缓存优先：即时渲染
